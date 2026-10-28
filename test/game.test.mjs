@@ -11,7 +11,7 @@ import { runPython } from '../src/lib/pymini.js';
 import { scoreOf, stuckText } from '../src/teacher/score.js';
 import { koreanOf } from '../src/data/translate.js';
 import { readFileSync } from 'node:fs';
-import { WRAPUP, wrapupFor } from '../src/data/wrapup.js';
+import { WRAPUP, wrapupFor, cleanNote, noteKey, collectNotes, notesSig, emptyRequired } from '../src/data/wrapup.js';
 import { snoOk, nameOk, maskName, cleanSno, cleanName } from '../src/data/who.js';
 import { LOGIC, logicHint, logicOpenNext, COMPARE, PAIR } from '../src/data/logic.js';
 import { PARTS, cardsFor, MISSIONS_OF } from '../src/data/parts.js';
@@ -263,4 +263,21 @@ for (const [i, q] of QUIZ.entries()) {
   참('물음은 물음표로 끝나거나 「한 가지」', WRAPUP.every((w) => /\?|\)$|한 가지$/.test(w.q)));
   const card = readFileSync(new URL('../src/cards/start.js', import.meta.url), 'utf-8');
   참('결과 카드에 정리 문장(정답)을 다시 적지 않는다', !/잡지 않으면 그 자리에서 멈춘다|예외가 없을 때만 \/ 언제나|예상되는 예외의 이름을 적는다/.test(card));
+
+  // 📤 제출 (2026-10-28) — 화면과 서버가 같은 물음·같은 다듬기를 쓴다
+  const { api } = loadServer();
+  확인('서버와 같은 물음 · 차시', api.NOTES.map((n) => [n[0], n[1]]), WRAPUP.map((w) => [w.id, w.part]));
+  확인('서버와 같은 길이 한도', api.NOTE_MAX, 300);
+  for (const v of ['  예외는  멈춤 ', 'a\nb\tc\r', '=1+1', 'x'.repeat(400), '', null, undefined, ' ' + '가'.repeat(299) + ' 끝', 'a\u0000b\u007f']) {
+    확인(`다듬기가 서버와 같다 「${String(v).slice(0, 10)}」`, cleanNote(v), api.cleanNote_(v));
+  }
+  참('두 번 다듬어도 같다 (서버가 한 번 더 다듬는다)', ['  a ', 'x'.repeat(299) + ' y', 'a\u0000b', ' \n '].every((v) => cleanNote(cleanNote(v)) === cleanNote(v)));
+  const W = (id) => WRAPUP.find((w) => w.id === id);
+  확인('「헷갈리는 것」 은 차시마다 따로 적는다', [noteKey(W('unsure'), 'p1'), noteKey(W('unsure'), 'p2'), noteKey(W('what'), 'p1')], ['unsure@p1', 'unsure@p2', 'what']);
+  확인('제출할 글 모으기 — 이 차시 물음만, 비운 칸은 빈 글', collectNotes('p1', { what: ' 실행 중 멈춤 ', 'unsure@p1': '없음', 'unsure@p2': '다른 차시', else: '2차시' }),
+    { what: '실행 중 멈춤', try: '', many: '', logic: '', unsure: '없음' });
+  참('낸 그대로면 꼬리표가 같고 고치면 달라진다', notesSig('p1', { what: 'a ' }) === notesSig('p1', { what: 'a', try: '' }) && notesSig('p1', { what: 'a' }) !== notesSig('p1', { what: 'b' }));
+  확인('⭐ 심화는 비워도 짚지 않는다', emptyRequired('p1', { what: 'a', try: 'b', many: 'c', unsure: 'd' }).map((w) => w.id), []);
+  확인('비운 칸 짚기', emptyRequired('p1', { what: 'a', try: '  ' }).map((w) => w.id), ['try', 'many', 'unsure']);
+  참('결과 카드에 제출 단추가 있다', /submitNotes\(part/.test(card) && /선생님께 제출하기/.test(card));
 }

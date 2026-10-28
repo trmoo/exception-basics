@@ -5,6 +5,8 @@
  *    ① 웹 앱을 연다 (index.html — Vite 로 만든 앱 한 파일)
  *    ② 학생 기기가 보낸 「사건」(카드 발견·미션 통과·막힌 곳·퀴즈)을 시트에 적는다
  *    ③ 교사 대시보드에 수업 하나의 현황을 모아 준다
+ *    ④ 결과 카드의 「오늘 배운 것」(학생이 내 말로 적은 정리)을 받아 「오늘 배운 것」 시트에 적는다
+ *       — 교사 대시보드 「✍️ 정리」 에서 물음별로 읽는다 (2026-10-28 사용자 지시)
  *
  *  학생은 맨 처음 학번 · 이름 · 비밀번호로 로그인하고(2026-10-28 사용자 지시) 자리 번호(1~40)를 고른다.
  *  비밀번호는 솔트 + SHA-256 해시로만 「계정(비밀번호)」 시트(숨김)에 남아 선생님도 볼 수 없다. 잊으면 시트 메뉴로 초기화한다.
@@ -19,12 +21,22 @@ var SHEET_LOG = '기록';
 var SHEET_STATE = '현황';
 var SHEET_SESSION = '수업';
 var SHEET_ACCOUNT = '계정(비밀번호)';
+var SHEET_NOTE = '오늘 배운 것';
 var HEAD_LOG = ['시각', '수업', '학번', '자리', '기기', '종류', '내용'];
 // 학생 한 명 = 한 줄 (수업 + 학번). 자리는 지금 앉은 곳 — 2차시에 자리를 옮겨도 기록이 이어진다.
 var HEAD_STATE = ['수업', '학번', '이름', '자리', '기기', '카드', '카드 수', '미션', '미션 수', '보스전', '별', '퀴즈 정답', '퀴즈 푼 수', '마지막', '처음'];
 var HEAD_SESSION = ['수업', '이름', '시작'];
 // 학생 계정 — 수업과 상관없이 학번 하나에 한 줄. 해시·솔트가 비어 있으면 「초기화된 계정」 이다.
 var HEAD_ACCOUNT = ['학번', '이름', '해시', '솔트', '만든 시각', '바꾼 시각'];
+// 🏁 오늘 배운 것 — 학생 한 명 · 차시 하나 = 한 줄 (수업 + 학번 + 차시). 고쳐서 다시 내면 같은 줄을 고쳐 쓴다.
+// NOTES 는 src/data/wrapup.js 의 WRAPUP 과 같아야 한다(시험이 대조한다) — [물음 id, 차시, 시트 열 이름]
+var NOTES = [
+  ['what', 'p1', '예외란'], ['try', 'p1', 'try·except'], ['many', 'p1', '여러 except'], ['logic', 'p1', '⭐ 논리 오류'],
+  ['else', 'p2', 'else'], ['finally', 'p2', 'finally'], ['misuse', 'p2', 'except: 남용'], ['unsure', 'all', '헷갈리는 것']
+];
+var NOTE_META = ['수업', '학번', '이름', '자리', '차시', '처음 제출', '마지막 제출', '제출 횟수'];
+var HEAD_NOTE = NOTE_META.concat(NOTES.map(function (n) { return n[2]; }));
+var NOTE_MAX = 300;
 var PW_MIN = 4;
 var PW_MAX = 30;
 var STU_TTL = 21600;  // 학생 출입증 6시간 (CacheService 의 한도)
@@ -86,14 +98,14 @@ function menuResetStudent() {
 
 function menuClear() {
   var ui = SpreadsheetApp.getUi();
-  var res = ui.alert('기록 모두 지우기', '모든 수업의 기록·현황과 학생 계정(비밀번호)을 지웁니다. 되돌릴 수 없어요. 지울까요?', ui.ButtonSet.YES_NO);
+  var res = ui.alert('기록 모두 지우기', '모든 수업의 기록·현황·오늘 배운 것과 학생 계정(비밀번호)을 지웁니다. 되돌릴 수 없어요. 지울까요?', ui.ButtonSet.YES_NO);
   if (res !== ui.Button.YES) return;
   clearAll_();
   ui.alert('지웠어요.');
 }
 
 function menuAbout() {
-  SpreadsheetApp.getUi().alert('부숴봐! 자판기 (교재판)\n\n© 2026 티쳐무 · 모든 권리 보유\n학교 수업 목적으로만 이용해 주세요.\n\n학생의 학번·이름·자리 번호를 이 시트에만 기록합니다.\n비밀번호는 해시로만 저장되어 선생님도 볼 수 없습니다.\n학기가 끝나면 「기록 모두 지우기」 로 지워 주세요.');
+  SpreadsheetApp.getUi().alert('부숴봐! 자판기 (교재판)\n\n© 2026 티쳐무 · 모든 권리 보유\n학교 수업 목적으로만 이용해 주세요.\n\n학생의 학번·이름·자리 번호와 「오늘 배운 것」 에 적은 글을 이 시트에만 기록합니다.\n비밀번호는 해시로만 저장되어 선생님도 볼 수 없습니다.\n학기가 끝나면 「기록 모두 지우기」 로 지워 주세요.');
 }
 
 /* ── 시트 다루기 ───────────────────────────────────────────────────── */
@@ -114,6 +126,7 @@ function setup_() {
   sheet_(SHEET_SESSION, HEAD_SESSION);
   sheet_(SHEET_STATE, HEAD_STATE);
   sheet_(SHEET_LOG, HEAD_LOG);
+  sheet_(SHEET_NOTE, HEAD_NOTE);
   var acc = sheet_(SHEET_ACCOUNT, HEAD_ACCOUNT);
   if (!acc.isSheetHidden()) acc.hideSheet();
 }
@@ -125,8 +138,8 @@ function rows_(sh, width) {
 }
 
 function clearAll_() {
-  var names = [SHEET_LOG, SHEET_STATE, SHEET_SESSION, SHEET_ACCOUNT];
-  var heads = [HEAD_LOG, HEAD_STATE, HEAD_SESSION, HEAD_ACCOUNT];
+  var names = [SHEET_LOG, SHEET_STATE, SHEET_SESSION, SHEET_ACCOUNT, SHEET_NOTE];
+  var heads = [HEAD_LOG, HEAD_STATE, HEAD_SESSION, HEAD_ACCOUNT, HEAD_NOTE];
   for (var i = 0; i < names.length; i++) {
     var sh = sheet_(names[i], heads[i]);
     var n = sh.getLastRow() - 1;
@@ -418,7 +431,7 @@ function stateOf_(row) {
  * 학번·이름은 출입증으로 가린다(화면이 보낸 학번을 믿지 않는다).
  * 한 번 더 묻는 경우(force 로 넘어간다):
  *   seatTaken  다른 학번이 그 자리에 앉아 있다 (자리를 잘못 골랐을 수 있다)
- * 들어오면 서버에 남은 기록(카드·미션·보스전·퀴즈)을 돌려준다 — 2차시에 다른 컴퓨터에 앉아도 이어진다.
+ * 들어오면 서버에 남은 기록(카드·미션·보스전·퀴즈)과 제출한 「오늘 배운 것」 을 돌려준다 — 2차시에 다른 컴퓨터에 앉아도 이어진다.
  */
 function apiJoin(sid, seat, pid, force, token) {
   sid = cleanSid_(sid); seat = cleanNum_(seat); pid = cleanPid_(pid);
@@ -435,7 +448,13 @@ function apiJoin(sid, seat, pid, force, token) {
     }
     writeState_(sh, sid, sno, name, seat, pid, null);
     sheet_(SHEET_LOG, HEAD_LOG).appendRow([new Date(), sid, sno, seat, pid, 'join', '']);
-    return { ok: true, state: mine ? stateOf_(mine) : null, name: name };
+    var state = mine ? stateOf_(mine) : null;
+    var notes = notesOf_(sid, sno);
+    if (notes.length) {
+      state = state || { cards: [], missions: [], boss: 0, stars: 0, quiz: 0, quizN: 0 };
+      state.notes = notes;
+    }
+    return { ok: true, state: state, name: name };
   });
 }
 
@@ -476,6 +495,92 @@ function apiEvent(ev) {
   });
 }
 
+/* ── 🏁 오늘 배운 것 ───────────────────────────────────────────────── */
+/** 적은 글 다듬기 — src/data/wrapup.js 의 cleanNote 와 같아야 한다(시험이 대조한다) */
+function cleanNote_(v) {
+  return String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, NOTE_MAX).trim();
+}
+/** 이 차시에 나오는 물음 (NOTES 의 줄 그대로) */
+function notesFor_(part) {
+  var out = [];
+  for (var i = 0; i < NOTES.length; i++) if (part === 'all' || NOTES[i][1] === 'all' || NOTES[i][1] === part) out.push(NOTES[i]);
+  return out;
+}
+// 시트는 = + - @ 로 시작하는 글을 수식으로 읽는다 — 앞에 ' 를 붙여 글자로 두고, 읽을 때 다시 뗀다
+function asText_(v) { return /^[=+\-@]/.test(v) ? "'" + v : v; }
+function fromText_(v) { return String(v == null ? '' : v).replace(/^'(?=[=+\-@])/, ''); }
+/** 읽기만 하는 곳 — 시트가 없으면(이 기능 전에 만든 시트) 만들지 않고 빈 것으로 본다 */
+function readSheet_(name, width) {
+  var sh = ss_().getSheetByName(name);
+  return sh ? rows_(sh, width) : [];
+}
+function time_(v) { return v instanceof Date ? v.getTime() : Number(new Date(v)) || 0; }
+function noteOf_(r) {
+  var notes = {};
+  for (var k = 0; k < NOTES.length; k++) {
+    var v = fromText_(r[NOTE_META.length + k]);
+    if (v) notes[NOTES[k][0]] = v;
+  }
+  return { sno: String(r[1]), name: String(r[2]), num: Number(r[3]) || 0, part: String(r[4]), first: time_(r[5]), at: time_(r[6]), count: Number(r[7]) || 0, notes: notes };
+}
+/** 수업 하나에서 제출한 글 (학번 차례) */
+function noteRows_(sid) {
+  var list = readSheet_(SHEET_NOTE, HEAD_NOTE.length);
+  var out = [];
+  for (var i = 0; i < list.length; i++) if (String(list[i][0]) === sid) out.push(noteOf_(list[i]));
+  out.sort(function (p, q) { return p.sno < q.sno ? -1 : p.sno > q.sno ? 1 : (p.part < q.part ? -1 : p.part > q.part ? 1 : 0); });
+  return out;
+}
+/** 한 학생이 이 수업에 낸 글 — [{ part, at, notes }] */
+function notesOf_(sid, sno) {
+  var rows = noteRows_(sid), out = [];
+  for (var i = 0; i < rows.length; i++) if (rows[i].sno === sno) out.push({ part: rows[i].part, at: rows[i].at, notes: rows[i].notes });
+  return out;
+}
+
+/**
+ * 학생이 결과 카드의 「오늘 배운 것」 을 제출한다.
+ *   req = { sid, pid, seat, token, part, notes: { 물음 id: 글 } }
+ * 학번·이름은 출입증으로 가린다(화면이 보낸 학번을 믿지 않는다). 이 차시 물음이 아닌 것은 버린다.
+ * 고쳐서 다시 내면 같은 줄(수업 + 학번 + 차시)을 고쳐 쓴다 — 처음 제출 시각은 남고 제출 횟수가 는다.
+ */
+function apiSubmitNotes(req) {
+  req = req || {};
+  var sid = cleanSid_(req.sid), pid = cleanPid_(req.pid), seat = cleanNum_(req.seat);
+  var part = cleanPart_(req.part);
+  var me = auth_(req.token);
+  var given = req.notes || {};
+  var list = notesFor_(part);
+  var n = 0;
+  for (var i = 0; i < list.length; i++) if (cleanNote_(given[list[i][0]])) n++;
+  if (!n) throw new Error('한 칸 이상 적어야 제출할 수 있어요.');
+  return withLock_(function () {
+    var sh = sheet_(SHEET_NOTE, HEAD_NOTE);
+    var all = rows_(sh, NOTE_META.length);
+    var row = 0;
+    for (var a = 0; a < all.length; a++) {
+      if (String(all[a][0]) === sid && String(all[a][1]) === me.sno && String(all[a][4]) === part) row = a + 2;
+    }
+    var prev = row ? sh.getRange(row, 1, 1, HEAD_NOTE.length).getValues()[0] : null;
+    var t = new Date();
+    var line = [sid, me.sno, me.name, seat, part, prev ? prev[5] : t, t, (prev ? Number(prev[7]) || 0 : 0) + 1];
+    for (var k = 0; k < NOTES.length; k++) line.push(list.indexOf(NOTES[k]) >= 0 ? asText_(cleanNote_(given[NOTES[k][0]])) : '');
+    if (row) sh.getRange(row, 1, 1, line.length).setValues([line]);
+    else sh.appendRow(line);
+    sheet_(SHEET_LOG, HEAD_LOG).appendRow([t, sid, me.sno, seat, pid, 'notes', part + ':' + n + '/' + list.length]);
+    return { ok: true, at: t.getTime(), n: n, total: list.length };
+  });
+}
+
+/** ✍️ 정리 — 수업 하나에서 학생들이 제출한 「오늘 배운 것」. 대시보드가 이 화면을 볼 때만 부른다(글이 길어 캐시에 담지 않는다). */
+function apiNotes(token, sid) {
+  checkToken_(token);
+  var cur = currentSession_();
+  sid = sid ? cleanSid_(sid) : (cur ? cur.id : '');
+  if (!sid) return { session: null, rows: [] };
+  return { session: { id: sid, part: partOf_(sid) }, rows: noteRows_(sid), at: now_() };
+}
+
 /* ── 교사 대시보드 ─────────────────────────────────────────────────── */
 /** 수업 하나의 현황. 같은 수업을 여러 번 물으면 4초 동안은 캐시로 답한다. */
 function apiDashboard(token, sid) {
@@ -499,6 +604,14 @@ function dashboard_(sid) {
   var t = now_();
   var students = [];
   var names = {};
+  // 「오늘 배운 것」 을 낸 차시 — 글은 apiNotes 로 따로 읽는다(여기서는 앞 다섯 칸만)
+  var noted = {};
+  var nrows = readSheet_(SHEET_NOTE, NOTE_META.length);
+  for (var c = 0; c < nrows.length; c++) {
+    if (String(nrows[c][0]) !== sid) continue;
+    var nk = String(nrows[c][1]);
+    (noted[nk] = noted[nk] || []).push(String(nrows[c][4]));
+  }
   var states = rows_(sheet_(SHEET_STATE, HEAD_STATE), HEAD_STATE.length);
   for (var a = 0; a < states.length; a++) {
     var r = states[a];
@@ -510,6 +623,7 @@ function dashboard_(sid) {
       sno: String(r[1]), name: String(r[2]), num: Number(r[3]) || 0, pid: String(r[4]),
       cards: st.cards, missions: st.missions,
       boss: st.boss, stars: st.stars, quiz: st.quiz, quizN: st.quizN,
+      noted: noted[String(r[1])] || [],
       online: t - last < 3 * 60 * 1000,
     });
   }

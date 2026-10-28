@@ -2,6 +2,8 @@
  *  교사 대시보드 — 웹 앱 주소에 ?page=teacher 를 붙여 연다. 교실 TV 에 띄우는 1280×720 한 화면.
  *    📺 발표 화면   — 우리 반이 찾은 예외 · 개인 순위 · 방금 소식 (학생과 함께 본다)
  *    🔍 선생님 화면 — 학생별 진행 · 미션별 통과 수 · 가장 많이 막힌 곳 · 확인 문제 정답률
+ *    ✍️ 정리       — 학생이 결과 카드에서 제출한 「오늘 배운 것」 을 물음별로 읽는다 (2026-10-28 사용자 지시)
+ *                    이 화면을 볼 때만 글을 불러온다(apiNotes). TV 에 띄울 때는 [🙈 이름 가리기].
  *  ⚠ 몇 초마다 서버를 묻는 것은 이 화면 하나뿐이다(학생 기기는 사건이 있을 때만 보낸다).
  */
 import { h, fill, toast, modal } from '../ui/dom.js';
@@ -12,6 +14,7 @@ import { QUIZ } from '../data/lessons.js';
 import { scoreOf, stuckText, MISSION_LABEL } from './score.js';
 import { PARTS, partOf } from '../data/parts.js';
 import { maskName } from '../data/who.js';
+import { wrapupFor } from '../data/wrapup.js';
 
 const POLL_MS = 5000;
 
@@ -23,6 +26,10 @@ export function renderDashboard(stage) {
   let data = null;
   let timer = null;
   let lastFeed = '';
+  // ✍️ 정리 — 제출한 글(notes)과 보고 있는 차시·물음·이름 가리기
+  let notes = null;
+  const nv = { part: '', q: '', mask: false };
+  let notesDrawn = '';
 
   const head = h('header', { class: 'card-head dash-head' });
   const body = h('main', { class: 'card-body' });
@@ -59,8 +66,10 @@ export function renderDashboard(stage) {
     call('apiDashboard', token, sid).then((d) => {
       data = d;
       if (d.session && !sid) sid = d.session.id;
-      paint();
-    }).catch((e) => {
+      // ✍️ 정리 화면을 볼 때만 글을 함께 읽는다 (글이 길어 대시보드 캐시에 넣지 않는다)
+      if (view !== 'notes' || !d.session) return null;
+      return call('apiNotes', token, d.session.id).then((n) => { notes = n; if (!nv.part) nv.part = d.session.part; });
+    }).then(() => paint()).catch((e) => {
       if (/로그인/.test(e.message)) { token = ''; try { sessionStorage.removeItem('exc-basics:tok'); } catch (x) { /* 무시 */ } login(); }
       else paintHead('⚠ 서버에 닿지 않아요 — 다시 시도하는 중');
     });
@@ -79,7 +88,7 @@ export function renderDashboard(stage) {
       h('p', { class: 'muted small-note' }, '💡 같은 반의 2차시는 새 수업을 만들지 말고 「📚 수업」 에서 그 반을 골라 「이어서 하기」 → 범위를 2차시로 바꾸세요. 그래야 학생 기록이 이어져요.'));
     setTimeout(() => inp.focus(), 50);
     if (!(await modal('🆕 새 수업 시작', box, { ok: '시작', cancel: '그만두기', wide: true }))) return;
-    call('apiStartSession', token, inp.value, part).then((s) => { sid = s.id; toast(`「${s.name}」 수업을 ${partOf(s.part).label} 범위로 시작했어요. 학생들에게 웹 앱 주소를 알려 주세요.`, 'gold'); poll(); })
+    call('apiStartSession', token, inp.value, part).then((s) => { sid = s.id; forgetNotes(); toast(`「${s.name}」 수업을 ${partOf(s.part).label} 범위로 시작했어요. 학생들에게 웹 앱 주소를 알려 주세요.`, 'gold'); poll(); })
       .catch((e) => toast(e.message, 'bad'));
   }
   // 🗂 범위 — 이번 시간에 학생 화면에 열 카드. 보고 있는 수업이 지난 수업이면 「이어서 하기」 도 여기서
@@ -103,9 +112,30 @@ export function renderDashboard(stage) {
   async function pickSession() {
     const list = await call('apiSessions', token).catch(() => []);
     if (!list.length) { toast('아직 수업이 없어요'); return; }
-    const box = h('div', { class: 'sess-list' }, ...list.map((s) => h('button', { class: 'btn' + (s.id === sid ? ' primary' : ''), onClick: () => { sid = s.id; document.querySelector('.overlay')?.remove(); poll(); } },
+    const box = h('div', { class: 'sess-list' }, ...list.map((s) => h('button', { class: 'btn' + (s.id === sid ? ' primary' : ''), onClick: () => { sid = s.id; forgetNotes(); document.querySelector('.overlay')?.remove(); poll(); } },
       s.name, h('small', {}, ` · ${partOf(s.part).label}`), s.current ? h('small', {}, ' (진행 중)') : null)));
     modal('📚 수업 고르기', box, { ok: '닫기' });
+  }
+
+  // 다른 수업으로 옮기면 앞 수업의 글을 버린다
+  function forgetNotes() { notes = null; nv.part = ''; nv.q = ''; notesDrawn = ''; }
+  function setView(v) {
+    view = v;
+    notesDrawn = '';
+    paint();
+    if (v === 'notes') poll();
+  }
+  // 한 학생이 낸 글 모두 — 🔍 선생님 화면의 학생 칸이나 ✍️ 정리의 이름을 누르면
+  async function openStudent(s) {
+    const r = await call('apiNotes', token, sid).catch((e) => { toast(e.message, 'bad'); return null; });
+    if (!r) return;
+    const mine = r.rows.filter((x) => x.sno === s.sno);
+    const name = view === 'notes' && nv.mask ? maskName(s.name) : `${s.name} (${s.sno})`;
+    modal(`✍️ ${name} — 오늘 배운 것`, mine.length ? h('div', { class: 'nv-stu' }, ...mine.map((row) => h('div', {},
+      h('p', { class: 'part-q' }, `${partOf(row.part).label} · ${hhmm(row.at)} 제출`, row.count > 1 ? h('small', {}, ` (고쳐서 ${row.count}번 냄)`) : null),
+      ...wrapupFor(row.part).map((w) => h('div', { class: 'nv-qa' }, h('b', {}, w.q),
+        h('p', {}, row.notes[w.id] || h('span', { class: 'muted' }, '(비움)')))))))
+      : '아직 제출하지 않았어요.', { ok: '닫기', wide: true });
   }
 
   function paintHead(note) {
@@ -117,8 +147,9 @@ export function renderDashboard(stage) {
       h('span', { class: 'muted' }, s ? `참여 ${n}명 · 지금 접속 ${on}명` : ''),
       note ? h('span', { class: 'warn-text' }, note) : null,
       h('div', { class: 'dash-tools' },
-        h('button', { class: 'btn small' + (view === 'show' ? ' primary' : ''), onClick: () => { view = 'show'; paint(); } }, '📺 발표'),
-        h('button', { class: 'btn small' + (view === 'teach' ? ' primary' : ''), onClick: () => { view = 'teach'; paint(); } }, '🔍 선생님'),
+        h('button', { class: 'btn small' + (view === 'show' ? ' primary' : ''), onClick: () => setView('show') }, '📺 발표'),
+        h('button', { class: 'btn small' + (view === 'teach' ? ' primary' : ''), onClick: () => setView('teach') }, '🔍 선생님'),
+        h('button', { class: 'btn small' + (view === 'notes' ? ' primary' : ''), onClick: () => setView('notes') }, '✍️ 정리'),
         s ? h('button', { class: 'btn small' + (s.current ? '' : ' warn'), onClick: partMenu }, s.current ? `🗂 ${partOf(s.part).label}` : '🗂 지난 수업') : null,
         h('button', { class: 'btn small', onClick: pickSession }, '📚 수업'),
         h('button', { class: 'btn small', onClick: newSession }, '🆕 새 수업')));
@@ -138,7 +169,29 @@ export function renderDashboard(stage) {
       toast(`🎉 우리 반 첫 발견! ${maskName(top.name)} — ${c ? c.icon : ''} ${top.x}`, 'gold big');
     }
     lastFeed = key;
-    fill(body, view === 'show' ? showView(data) : teachView(data));
+    if (view === 'notes') { paintNotes(); return; }
+    fill(body, view === 'show' ? showView(data) : teachView(data, { openStudent, openNotes: () => setView('notes') }));
+  }
+
+  // ✍️ 정리 — 5초마다 새로 읽지만, 글이 그대로면 다시 그리지 않는다(읽던 자리가 튀지 않게)
+  function paintNotes() {
+    if (!notes || !notes.session || notes.session.id !== data.session.id) {
+      if (!body.querySelector('.nv-wait')) fill(body, h('div', { class: 'center-msg nv-wait' }, h('p', {}, '✍️ 제출한 글을 불러오는 중…')));
+      return;
+    }
+    const sig = JSON.stringify([notes.rows, data.students.map((x) => [x.sno, x.name]), nv]);
+    if (sig === notesDrawn && body.querySelector('.dash-notes')) return;
+    const old = body.querySelector('.nv-list');
+    const keep = old && old.dataset.q === nv.q ? old.scrollTop : 0;
+    notesDrawn = sig;
+    fill(body, notesView(data, notes, nv, {
+      setPart: (p) => { nv.part = p; nv.q = ''; paintNotes(); },
+      setQ: (q) => { nv.q = q; paintNotes(); },
+      toggleMask: () => { nv.mask = !nv.mask; paintNotes(); },
+      openStudent,
+    }));
+    const list = body.querySelector('.nv-list');
+    if (list) list.scrollTop = keep;
   }
 }
 
@@ -175,15 +228,24 @@ function showView(d) {
         h('ul', { class: 'feed' }, ...(d.feed.length ? d.feed.slice(0, 8).map((e) => h('li', {}, feedText(e))) : [h('li', { class: 'muted' }, '아직 소식이 없어요')])))));
 }
 
+const hhmm = (t) => (t ? new Date(t).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '');
+// 이 수업의 지금 차시에 「오늘 배운 것」 을 냈나 (범위가 전체면 어느 차시든)
+const notedNow = (s, part) => (s.noted || []).some((p) => part === 'all' || p === part);
+
 /* ── 🔍 선생님 화면 ───────────────────────────────────────────────── */
-function teachView(d) {
+function teachView(d, act) {
   const total = d.students.length || 1;
+  const part = d.session.part;
+  const nNoted = d.students.filter((s) => notedNow(s, part)).length;
   return h('div', { class: 'dash-teach' },
-    h('div', { class: 'dt-grid' }, ...(d.students.length ? d.students.map((s) => h('div', { class: 'stu' + (s.online ? ' on' : '') },
+    h('div', { class: 'dt-grid' }, ...(d.students.length ? d.students.map((s) => h('div', {
+      class: 'stu' + (s.online ? ' on' : '') + ((s.noted || []).length ? ' noted' : ''),
+      title: (s.noted || []).length ? '눌러서 「오늘 배운 것」 읽기' : null,
+      onClick: (s.noted || []).length ? () => act.openStudent(s) : null },
       h('div', { class: 'stu-num' }, h('span', {}, s.name, h('small', {}, ` ${s.sno}`)), h('span', { class: 'stu-seat' }, `🪑${s.num}`), h('span', { class: 'dot' })),
       h('div', { class: 'stu-cards' }, ...CARDS.map((c) => h('span', { class: s.cards.includes(c.id) ? 'on' : '', style: { '--c': c.color } }))),
       h('div', { class: 'stu-ms' }, ...MISSIONS.map((m) => h('span', { class: s.missions.includes(m.id) ? 'on' : '' }, m.boss ? 'B' : String(m.no)))),
-      h('div', { class: 'stu-q' }, s.quizN ? `✅ ${s.quiz}/${QUIZ.length}` : ''))) : [h('p', { class: 'muted' }, '아직 들어온 학생이 없어요.')])),
+      h('div', { class: 'stu-q' }, s.quizN ? `✅ ${s.quiz}/${QUIZ.length}` : '', notedNow(s, part) ? h('span', { class: 'stu-noted' }, '✍️ 제출') : null))) : [h('p', { class: 'muted' }, '아직 들어온 학생이 없어요.')])),
     h('div', { class: 'dt-side' },
       h('h3', {}, '🛡️ 미션별 통과'),
       ...MISSIONS.map((m) => {
@@ -194,5 +256,37 @@ function teachView(d) {
       h('h3', {}, '🧗 가장 많이 막힌 곳'),
       d.stuck.length ? h('ol', { class: 'stuck' }, ...d.stuck.slice(0, 5).map((s) => h('li', {}, stuckText(s.what), h('b', {}, ` ${s.n}회`)))) : h('p', { class: 'muted' }, '아직 없어요'),
       h('h3', {}, '✅ 확인 문제'),
-      h('p', {}, d.quiz.total ? `정답률 ${Math.round((d.quiz.right / d.quiz.total) * 100)}% (${d.quiz.right}/${d.quiz.total})` : '아직 푼 학생이 없어요')));
+      h('p', {}, d.quiz.total ? `정답률 ${Math.round((d.quiz.right / d.quiz.total) * 100)}% (${d.quiz.right}/${d.quiz.total})` : '아직 푼 학생이 없어요'),
+      h('h3', {}, '✍️ 오늘 배운 것'),
+      h('div', { class: 'dt-notes' }, h('span', {}, `제출 ${nNoted} / ${d.students.length}명`), h('button', { class: 'btn small', onClick: act.openNotes }, '읽어 보기 →'))));
+}
+
+/* ── ✍️ 정리 — 학생이 제출한 「오늘 배운 것」 을 물음별로 ─────────────────── */
+function notesView(d, n, nv, act) {
+  const rows = n.rows || [];
+  // 차시 — 지금 수업의 범위가 기본, 다른 차시에 낸 글이 있으면 그 단추도 보인다
+  const parts = PARTS.filter((p) => p.id === nv.part || p.id === d.session.part || rows.some((r) => r.part === p.id));
+  const mine = rows.filter((r) => r.part === nv.part);
+  const qs = wrapupFor(nv.part);
+  const q = qs.find((w) => w.id === nv.q) || qs[0];
+  const who = (r) => (nv.mask ? maskName(r.name) : r.name);
+  const sent = new Set(mine.map((r) => r.sno));
+  const notYet = d.students.filter((x) => !sent.has(x.sno));
+  const answers = mine.filter((r) => r.notes[q.id]);
+  const blank = mine.length - answers.length;
+  return h('div', { class: 'dash-notes' },
+    h('div', { class: 'nv-side' },
+      parts.length > 1 ? h('div', { class: 'nv-parts' }, ...parts.map((p) => h('button', { class: 'btn small' + (p.id === nv.part ? ' primary' : ''), onClick: () => act.setPart(p.id) }, p.label))) : null,
+      h('p', { class: 'nv-count' }, h('b', {}, `제출 ${mine.length}명`), ` / 참여 ${d.students.length}명`),
+      ...qs.map((w) => h('button', { class: 'nv-q' + (w.id === q.id ? ' on' : ''), onClick: () => act.setQ(w.id) },
+        h('span', {}, w.q), h('b', {}, String(mine.filter((r) => r.notes[w.id]).length)))),
+      h('button', { class: 'btn small nv-mask', onClick: act.toggleMask }, nv.mask ? '🙂 이름 보이기' : '🙈 이름 가리기 (TV 에 띄울 때)')),
+    h('div', { class: 'nv-main' },
+      h('h3', { class: 'nv-title' }, q.q),
+      h('div', { class: 'nv-list', 'data-q': nv.q }, ...(answers.length ? answers.map((r) => h('div', { class: 'nv-ans' },
+        h('button', { class: 'nv-who', title: '이 학생이 적은 것 모두 보기', onClick: () => act.openStudent(r) }, who(r)),
+        h('p', {}, r.notes[q.id])))
+        : [h('p', { class: 'muted' }, mine.length ? '이 물음에 적은 학생이 아직 없어요.' : '아직 제출한 학생이 없어요. 학생이 결과 카드에서 [📤 제출하기] 를 누르면 여기에 모여요.')])),
+      h('p', { class: 'nv-foot muted' }, blank ? `이 물음을 비우고 낸 학생 ${blank}명 · ` : '',
+        notYet.length ? `아직 제출하지 않은 학생 ${notYet.length}명 — ${notYet.map(who).join(', ')}` : (d.students.length ? '모두 제출했어요 🎉' : ''))));
 }

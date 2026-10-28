@@ -1,14 +1,16 @@
 /*! 부숴봐! 자판기 (교재판) — © 2026 티쳐무 · 모든 권리 보유
  *  학생 기록 — 찾은 카드 · 미션 · 보스전 · 퀴즈 · 미션 코드. 이 브라우저(localStorage)에 수업별로 남는다.
  *  수업에 들어가 있으면 사건이 있을 때마다 서버로 짧게 보낸다(자리 · 로그인 출입증 + 기록. 학번·이름은 서버가 출입증으로 가린다).
+ *  결과 카드의 「오늘 배운 것」 은 학생이 [📤 제출하기] 를 누를 때만 보낸다(submitNotes).
  */
-import { call, online } from '../net/gas.js';
+import { call, callRetry, online } from '../net/gas.js';
 import { retryable, wait } from '../net/retry.js';
 import { cardOf } from '../data/machine.js';
 import { openNext } from './hints.js';
 import { logicOf, logicOpenNext } from '../data/logic.js';
+import { wrapupFor, noteKey, collectNotes, notesSig } from '../data/wrapup.js';
 
-const fresh = () => ({ cards: {}, missions: {}, boss: 0, stars: 0, quiz: {}, picks: {}, codes: {}, hints: {}, logic: {}, lhints: {}, notes: {}, card: 0 });
+const fresh = () => ({ cards: {}, missions: {}, boss: 0, stars: 0, quiz: {}, picks: {}, codes: {}, hints: {}, logic: {}, lhints: {}, notes: {}, sent: {}, card: 0 });
 
 // 지금 들어가 있는 수업과 학생 — name 은 수업 이름, num 은 자리 번호, sno·stu 는 학번·이름, tok 은 로그인 출입증
 export const ME = { sid: '', name: '', num: 0, pid: '', part: 'all', sno: '', stu: '', tok: '' };
@@ -62,6 +64,15 @@ function mergeServer(st) {
   for (const id of st.cards || []) if (cardOf(id) && !S.cards[id]) S.cards[id] = { at: 0 };
   for (const id of st.missions || []) if (!S.missions[id]) S.missions[id] = true;
   if ((st.boss || 0) > (S.boss || 0)) { S.boss = st.boss; S.stars = Math.max(S.stars || 0, st.stars || 0); }
+  // 제출한 「오늘 배운 것」 — 이 기기에서 비어 있는 칸만 채우고, 제출한 글을 기억해 「제출함」 으로 보이게 한다
+  for (const e of st.notes || []) {
+    const byId = e.notes || {};
+    for (const w of wrapupFor(e.part)) {
+      const k = noteKey(w, e.part);
+      if (!String(S.notes[k] || '').trim() && byId[w.id]) S.notes[k] = byId[w.id];
+    }
+    S.sent[e.part] = { at: e.at, sig: notesSig(e.part, byId) };
+  }
 }
 
 /** 이 탭에서 이 수업에 마지막으로 들어간 학생 — { seat, sno, stu, tok } 또는 null */
@@ -173,8 +184,25 @@ export function answerQuiz(i, ok, picked) {
   save(); send('quiz', `${i + 1}:${ok ? 'O' : 'X'}`);
 }
 export function saveCode(id, code) { S.codes[id] = code; save(); }
-/** 🏁 오늘 배운 것 — 학생이 직접 적은 정리 (이 기기에만, 서버로는 안 보낸다) */
+/** 🏁 오늘 배운 것 — 학생이 직접 적은 정리. 적는 동안은 이 기기에만 두고, [📤 제출하기] 를 누르면 submitNotes 가 보낸다.
+ *  key 는 noteKey( ) 로 만든다 (「아직 헷갈리는 것」 은 차시마다 따로) */
 export function setNote(id, text) { S.notes = S.notes || {}; S.notes[id] = String(text).slice(0, 300); try { localStorage.setItem(keyOf(), JSON.stringify(S)); } catch (e) { /* 무시 */ } }
+/** 🏁 이 차시의 「오늘 배운 것」 을 선생님께 제출한다 → { ok, at, n, total }. 접속이 몰리면 저절로 몇 번 더 보낸다(onRetry). */
+export async function submitNotes(part, { onRetry } = {}) {
+  if (!online || !ME.sid || !ME.num || !ME.tok) throw new Error('수업에 들어가 있을 때만 제출할 수 있어요.');
+  const notes = collectNotes(part, S.notes);
+  const r = await callRetry('apiSubmitNotes', [{ sid: ME.sid, pid: ME.pid, seat: ME.num, token: ME.tok, part, notes }], { onRetry });
+  S.sent = S.sent || {};
+  S.sent[part] = { at: r.at, sig: notesSig(part, notes) };
+  save();
+  return r;
+}
+/** 제출 상태 — state: 'none'(아직 안 냄) · 'sent'(낸 그대로) · 'edited'(낸 뒤에 고침), at: 마지막으로 낸 시각 */
+export function noteStatus(part) {
+  const s = S.sent && S.sent[part];
+  if (!s) return { state: 'none', at: 0 };
+  return { state: s.sig === notesSig(part, collectNotes(part, S.notes)) ? 'sent' : 'edited', at: s.at };
+}
 // 보던 카드는 id 로 남긴다 — 차시마다 카드 목록이 달라 차례 번호로는 엉뚱한 카드로 돌아간다
 export function setCard(id) { S.card = id; try { localStorage.setItem(keyOf(), JSON.stringify(S)); } catch (e) { /* 무시 */ } }
 

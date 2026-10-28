@@ -160,6 +160,87 @@ const throws = (fn) => { try { fn(); return ''; } catch (e) { return e.message; 
   확인('기록 모두 지우기 (계정까지)', [gas.sheets.get('기록').getLastRow(), gas.sheets.get('현황').getLastRow(), gas.sheets.get('계정(비밀번호)').getLastRow(), api.apiHello().session], [1, 1, 1, null]);
 }
 
+묶음('서버 — 🏁 오늘 배운 것 제출 · ✍️ 정리 (2026-10-28)');
+{
+  const { api, gas } = loadServer();
+  gas.ui.promptAnswer = 'abcd';
+  api.menuPassword();
+  const tok = api.apiLogin('abcd').token;
+  const s = api.apiStartSession(tok, '2-1', 'p1');
+  const hong = api.apiStudentLogin('20307', '홍길동', 'pw1234').token;
+  const kim = api.apiStudentLogin('20301', '김철수', 'kim1').token;
+  api.apiJoin(s.id, 7, 'aaaaaa11', false, hong);
+  api.apiJoin(s.id, 3, 'bbbbbb22', false, kim);
+  let tick = 0;
+  // 대시보드 4초 캐시를 넘기되 출입증은 살려 둔다
+  const later = () => { tick += 5000; gas.setClock(() => Date.now() + tick); gas.cache.forEach((v, k) => { if (k.startsWith('tok:') || k.startsWith('stu:')) v.until = Infinity; }); };
+  const sub = (token, o) => api.apiSubmitNotes({ sid: s.id, pid: 'aaaaaa11', seat: 7, token, part: 'p1', ...o });
+
+  참('출입증 없이 못 낸다 (학번을 적어 보내도)', /로그인/.test(throws(() => api.apiSubmitNotes({ sid: s.id, pid: 'aaaaaa11', seat: 7, sno: '20307', name: '홍길동', part: 'p1', notes: { what: 'x' } }))));
+  참('모두 비우면 못 낸다', /한 칸 이상/.test(throws(() => sub(hong, { notes: { what: '  ', try: '' } }))));
+  참('이 차시 물음이 아닌 것만 적어도 못 낸다', /한 칸 이상/.test(throws(() => sub(hong, { notes: { else: '2차시 물음' } }))));
+  참('모르는 차시는 거절', /차시/.test(throws(() => sub(hong, { part: 'p7', notes: { what: 'x' } }))));
+  gas.lock.busy = true;
+  참('접속이 몰리면 BUSY (화면이 다시 보낸다)', /^BUSY/.test(throws(() => sub(hong, { notes: { what: 'x' } }))));
+  gas.lock.busy = false;
+
+  const r1 = sub(hong, { notes: { what: '실행 도중에\n멈추는 것', try: '=SUM(A1)', many: '-', logic: '', unsure: 'x'.repeat(400), else: '2차시 물음은 버린다', hack: '모르는 칸' } });
+  확인('제출 — 적은 칸 수 / 이 차시 물음 수', [r1.ok, r1.n, r1.total, typeof r1.at], [true, 4, 5, 'number']);
+  const sh = gas.sheets.get('오늘 배운 것');
+  참('「오늘 배운 것」 시트가 생긴다', !!sh);
+  확인('머리글', sh.rows[0].slice(0, 8), ['수업', '학번', '이름', '자리', '차시', '처음 제출', '마지막 제출', '제출 횟수']);
+  확인('물음마다 한 열', sh.rows[0].slice(8), api.NOTES.map((n) => n[2]));
+  const line = sh.rows[1];
+  확인('학번·이름은 출입증에서 가린다', line.slice(0, 5), [s.id, '20307', '홍길동', 7, 'p1']);
+  확인('줄바꿈은 빈칸으로', line[8], '실행 도중에 멈추는 것');
+  확인('= · - 로 시작하는 글은 앞에 \' 를 붙여 글자로 둔다 (수식이 되지 않게)', [line[9], line[10]], ["'=SUM(A1)", "'-"]);
+  확인('300자까지', line[8 + 7].length, 300);
+  확인('다른 차시 물음 · 모르는 칸은 버린다', [line[8 + 4], line.length], ['', 8 + api.NOTES.length]);
+  참('기록 시트에는 제출했다는 것만 (글은 안 남긴다)', gas.sheets.get('기록').rows.some((r) => r && r[5] === 'notes' && r[6] === 'p1:4/5') && !JSON.stringify(gas.sheets.get('기록').rows).includes('멈추는 것'));
+
+  참('출입증 없이 글을 못 읽는다', /로그인/.test(throws(() => api.apiNotes('nope', s.id))));
+  const n1 = api.apiNotes(tok, s.id);
+  확인('✍️ 정리 — 낸 글 그대로 (앞의 \' 는 뗀다, 비운 칸은 없다)', n1.rows[0].notes, { what: '실행 도중에 멈추는 것', try: '=SUM(A1)', many: '-', unsure: 'x'.repeat(300) });
+  확인('✍️ 정리 — 수업 차시', n1.session, { id: s.id, part: 'p1' });
+  확인('수업을 고르지 않으면 지금 수업', api.apiNotes(tok, '').rows.length, 1);
+
+  // 고쳐서 다시 내면 같은 줄을 고쳐 쓴다
+  const first = line[5];
+  sub(hong, { notes: { what: '고친 답', try: 'try 는 감싸고 except 는 대신 할 일' } });
+  확인('다시 내면 같은 줄', sh.getLastRow(), 2);
+  확인('처음 제출 시각은 남고 횟수가 는다', [sh.rows[1][5] === first, sh.rows[1][7]], [true, 2]);
+  확인('다시 낸 글로 바뀐다 (비우고 낸 칸은 비운다)', api.apiNotes(tok, s.id).rows[0].notes, { what: '고친 답', try: 'try 는 감싸고 except 는 대신 할 일' });
+
+  api.apiSubmitNotes({ sid: s.id, pid: 'bbbbbb22', seat: 3, token: kim, part: 'p1', notes: { unsure: '여러 except 차례' } });
+  확인('학번 차례', api.apiNotes(tok, s.id).rows.map((r) => [r.sno, r.name, r.num, r.part]), [['20301', '김철수', 3, 'p1'], ['20307', '홍길동', 7, 'p1']]);
+
+  // 2차시 — 같은 수업 · 같은 학생이라도 차시마다 한 줄 (「헷갈리는 것」 이 1차시 답을 덮지 않게)
+  api.apiSetPart(tok, s.id, 'p2');
+  api.apiSubmitNotes({ sid: s.id, pid: 'aaaaaa11', seat: 7, token: hong, part: 'p2', notes: { else: '예외가 없을 때', unsure: '2차시에 헷갈린 것', what: '1차시 칸은 버린다' } });
+  const rs = api.apiNotes(tok, s.id).rows.filter((r) => r.sno === '20307');
+  확인('차시마다 한 줄', rs.map((r) => [r.part, r.notes]), [['p1', { what: '고친 답', try: 'try 는 감싸고 except 는 대신 할 일' }], ['p2', { else: '예외가 없을 때', unsure: '2차시에 헷갈린 것' }]]);
+
+  later();
+  확인('대시보드 — 학생마다 낸 차시 (글은 싣지 않는다)', api.apiDashboard(tok, s.id).students.map((x) => [x.sno, x.noted]), [['20301', ['p1']], ['20307', ['p1', 'p2']]]);
+  참('대시보드 답에는 글이 없다 (5초마다 읽으므로)', !JSON.stringify(api.apiDashboard(tok, s.id)).includes('고친 답'));
+
+  // 다른 컴퓨터에 앉아도 낸 글이 돌아온다 — 빈 칸으로 다시 내서 덮어쓰지 않게
+  const back = api.apiJoin(s.id, 9, 'cccccc33', false, hong);
+  확인('들어오면 낸 글을 돌려받는다', back.state.notes.map((e) => [e.part, e.notes.what || e.notes.else, typeof e.at]), [['p1', '고친 답', 'number'], ['p2', '예외가 없을 때', 'number']]);
+  확인('낸 글이 없는 학생은 그대로', api.apiJoin(s.id, 21, 'dddddd44', false, api.apiStudentLogin('20321', '이영희', 'lee1').token).state, null);
+
+  // 이 기능 전에 만든 시트 — 읽기만 할 때는 탭을 만들지 않고 빈 것으로 본다
+  gas.sheets.delete('오늘 배운 것');
+  later();
+  확인('옛 시트에서도 대시보드 · 정리가 열린다', [api.apiNotes(tok, s.id).rows.length, api.apiDashboard(tok, s.id).students[0].noted, gas.sheets.has('오늘 배운 것')], [0, [], false]);
+  sub(hong, { part: 'p2', notes: { finally: '언제나' } });
+  참('처음 제출할 때 탭을 만든다', gas.sheets.has('오늘 배운 것') && gas.sheets.get('오늘 배운 것').getLastRow() === 2);
+
+  gas.ui.confirm = 'YES';
+  api.menuClear();
+  확인('기록 모두 지우기에 「오늘 배운 것」 도 들어간다', gas.sheets.get('오늘 배운 것').getLastRow(), 1);
+}
+
 묶음('서버 — 30명이 한꺼번에 몰릴 때 (잠금을 못 잡음)');
 {
   const { api, gas } = loadServer();

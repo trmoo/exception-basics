@@ -4,8 +4,8 @@
 import { h, fill, modal, toast } from '../ui/dom.js';
 import { createVending } from '../ui/vending.js';
 import { call, callRetry, errText, online, MODE } from '../net/gas.js';
-import { S, ME, enter, soloStart, savedMe, resetDevice, NET, devicePid, setNote } from '../game/store.js';
-import { wrapupFor } from '../data/wrapup.js';
+import { S, ME, enter, soloStart, savedMe, resetDevice, NET, devicePid, setNote, submitNotes, noteStatus } from '../game/store.js';
+import { wrapupFor, noteKey, collectNotes, emptyRequired } from '../data/wrapup.js';
 import { cleanSno, cleanName, snoOk, nameOk } from '../data/who.js';
 import { CARDS } from '../data/machine.js';
 import { MISSIONS } from '../data/missions.js';
@@ -169,13 +169,45 @@ export function resultCard(body, deck) {
   const q = Object.values(S.quiz);
   const p1 = part !== 'p2', p2 = part !== 'p1';
   // 「오늘 배운 것」 은 보여 주지 않고 선생님과 함께 학생이 직접 적는다 (정답 문장 없음, 💡 는 실마리 낱말만)
+  // 수업에 들어가 있으면 [📤 제출하기] 로 선생님 대시보드(✍️ 정리)에 보낸다 — 혼자 모드는 이 기기에만 남는다
+  const live = online && !!ME.num;
   const notes = S.notes || {};
   const rows = wrapupFor(part).map((w) => {
-    const inp = h('input', { type: 'text', class: 'wu-in', maxlength: '300', value: notes[w.id] || '', placeholder: '내 말로 적어 보세요', 'aria-label': w.q, spellcheck: 'false' });
-    inp.addEventListener('input', () => setNote(w.id, inp.value));
+    const key = noteKey(w, part);
+    const inp = h('input', { type: 'text', class: 'wu-in', maxlength: '300', value: notes[key] || '', placeholder: '내 말로 적어 보세요', 'aria-label': w.q, spellcheck: 'false' });
+    inp.addEventListener('input', () => { setNote(key, inp.value); paintSend(); });
     const tip = w.hint ? h('button', { class: 'wu-tip', title: '실마리 낱말 보기', onClick: (e) => { inp.placeholder = `💡 ${w.hint}`; e.currentTarget.disabled = true; inp.focus(); } }, '💡') : null;
     return h('label', { class: 'wu-row' }, h('span', { class: 'wu-q' }, w.q), inp, tip || h('span', {}));
   });
+  // 📤 제출 — 낸 뒤에 고치면 「다시 제출하세요」 를 알린다
+  const sendNote = h('span', { class: 'wu-state' });
+  const sendBtn = h('button', { class: 'btn', onClick: () => doSubmit() });
+  function paintSend() {
+    if (!live) return;
+    const st = noteStatus(part);
+    const hm = st.at ? new Date(st.at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '';
+    fill(sendNote, st.state === 'sent' ? `✅ ${hm}에 제출했어요` : st.state === 'edited' ? '✏️ 고친 내용이 있어요 — 다시 제출하세요' : '아직 제출하지 않았어요');
+    sendNote.className = `wu-state ${st.state}`;
+    sendBtn.textContent = st.state === 'none' ? '📤 선생님께 제출하기' : '📤 다시 제출하기';
+    sendBtn.className = 'btn' + (st.state === 'sent' ? '' : ' primary');
+  }
+  async function doSubmit() {
+    const byId = collectNotes(part, S.notes);
+    if (!Object.values(byId).some(Boolean)) { toast('한 칸 이상 적은 뒤에 제출하세요.', 'bad'); return; }
+    const empty = emptyRequired(part, byId);
+    if (empty.length && !(await modal('아직 비어 있는 칸이 있어요', `${empty.length}칸을 아직 적지 않았어요. 그대로 제출할까요? (고쳐서 다시 낼 수 있어요)`, { ok: '그대로 제출', cancel: '더 적기' }))) return;
+    sendBtn.disabled = true;
+    fill(sendNote, '보내는 중…');
+    try {
+      await submitNotes(part, { onRetry: () => fill(sendNote, '⏳ 친구들이 한꺼번에 보내는 중이에요. 저절로 다시 보내요…') });
+      toast('선생님께 제출했어요! 고치고 싶으면 고친 뒤 다시 제출하세요.', 'gold');
+    } catch (e) {
+      toast(/로그인/.test(e.message) ? '로그인 시간이 지났어요. 처음 카드에서 다시 로그인한 뒤 제출하세요. (적은 글은 남아 있어요)' : `제출하지 못했어요 — ${errText(e)}`, 'bad');
+    }
+    sendBtn.disabled = false;
+    paintSend();
+  }
+  paintSend();
   const tile = (icon, big, label) => h('div', { class: 'res-tile' }, h('div', { class: 'res-icon' }, icon), h('div', { class: 'res-big' }, big), h('div', {}, label));
   fill(body, h('div', { class: 'result' },
     h('div', { class: 'res-tiles' },
@@ -185,8 +217,9 @@ export function resultCard(body, deck) {
       p2 ? tile('👾', `${S.boss} / 10 ${'⭐'.repeat(S.stars)}`, '보스전') : null,
       p2 ? tile('✅', `${q.filter(Boolean).length} / ${QUIZ.length}`, '확인 문제') : null),
     h('div', { class: 'res-summary' },
-      h('h3', {}, '✍️ 오늘 배운 것 — 선생님과 함께 정리해요'),
-      h('p', { class: 'muted wu-lead' }, '선생님과 이야기 나눈 뒤 내 말로 적어 보세요. 막히면 💡 를 누르면 실마리 낱말이 보여요. (적은 글은 이 컴퓨터에만 남아요)'),
+      h('div', { class: 'wu-head' }, h('h3', {}, '✍️ 오늘 배운 것 — 선생님과 함께 정리해요'), live ? h('div', { class: 'wu-send' }, sendNote, sendBtn) : null),
+      h('p', { class: 'muted wu-lead' }, live ? '선생님과 이야기 나눈 뒤 내 말로 적어 보세요. 막히면 💡 를 누르면 실마리 낱말이 보여요. 다 적으면 [📤 제출하기] 로 선생님께 보내요.'
+        : '선생님과 이야기 나눈 뒤 내 말로 적어 보세요. 막히면 💡 를 누르면 실마리 낱말이 보여요. (혼자 모드 — 적은 글은 이 컴퓨터에만 남아요)'),
       // 물음이 많으면(「전체」 범위) 두 칸으로 — 한 화면에 들어가게
       h('div', { class: 'wu-list' + (rows.length > 5 ? ' two' : '') }, ...rows),
       part === 'p1' ? h('p', { class: 'muted wu-next' }, '다음 시간 — else·finally 와 👾 보스전! 오늘 기록은 그대로 이어져요.') : null),

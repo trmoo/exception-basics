@@ -3,7 +3,7 @@
  */
 import { h, fill, modal, toast } from '../ui/dom.js';
 import { createVending } from '../ui/vending.js';
-import { call, online, MODE } from '../net/gas.js';
+import { call, callRetry, errText, online, MODE } from '../net/gas.js';
 import { S, ME, enter, soloStart, savedMe, resetDevice, NET, devicePid, setNote } from '../game/store.js';
 import { wrapupFor } from '../data/wrapup.js';
 import { cleanSno, cleanName, snoOk, nameOk } from '../data/who.js';
@@ -67,6 +67,8 @@ export function startCard(body, deck) {
     const busy = (btn, on) => { btn.disabled = on; };
 
     // 로그인 ① — 학번
+    // 30명이 한꺼번에 들어오면 서버가 「바쁨」을 돌려준다 — 그때 보이는 글(callRetry 가 저절로 다시 보낸다)
+    const crowded = '⏳ 친구들이 한꺼번에 들어오는 중이에요. 잠깐만 기다리면 저절로 다시 시도해요…';
     function login(snoValue = '') {
       const sno = box({ inputmode: 'numeric', maxlength: '6', placeholder: '예) 20314', 'aria-label': '학번', value: snoValue });
       const msg = h('p', { class: 'who-msg' });
@@ -75,7 +77,8 @@ export function startCard(body, deck) {
         if (!snoOk(sno.value)) { fill(msg, '학번은 숫자 4~6자리로 적어 주세요.'); sno.focus(); return; }
         const s = cleanSno(sno.value);
         busy(next, true);
-        call('apiStudentCheck', s).then((r) => step2(s, r)).catch((e) => { fill(msg, `확인하지 못했어요 — ${e.message}`); busy(next, false); });
+        callRetry('apiStudentCheck', [s], { onRetry: () => fill(msg, h('span', { class: 'muted' }, crowded)) })
+          .then((r) => step2(s, r)).catch((e) => { fill(msg, `확인하지 못했어요 — ${errText(e)}`); busy(next, false); });
       };
       next.addEventListener('click', go);
       sno.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
@@ -103,10 +106,10 @@ export function startCard(body, deck) {
         if (pw.value.length < 4) { fill(msg, '비밀번호는 4자 이상이에요.'); pw.focus(); return; }
         if (pw2 && pw.value !== pw2.value) { fill(msg, '두 비밀번호가 서로 달라요. 다시 적어 주세요.'); pw2.value = ''; pw2.focus(); return; }
         busy(ok, true);
-        call('apiStudentLogin', sno, stu ? cleanName(stu.value) : '', pw.value).then((res) => {
+        callRetry('apiStudentLogin', [sno, stu ? cleanName(stu.value) : '', pw.value], { onRetry: () => fill(msg, h('span', { class: 'muted' }, crowded)) }).then((res) => {
           if (!res.ok) { fill(msg, res.msg); busy(ok, false); pw.value = ''; if (pw2) pw2.value = ''; pw.focus(); return; }
           seats({ sno: res.sno, stu: res.name, tok: res.token });
-        }).catch((e) => { fill(msg, `로그인하지 못했어요 — ${e.message}`); busy(ok, false); });
+        }).catch((e) => { fill(msg, `로그인하지 못했어요 — ${errText(e)}`); busy(ok, false); });
       };
       ok.addEventListener('click', go);
       [stu, pw, pw2].filter(Boolean).forEach((el) => el.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); }));
@@ -137,7 +140,7 @@ export function startCard(body, deck) {
     }
 
     function goIn(seat, acct, force) {
-      call('apiJoin', session.id, seat, devicePid(), force, acct.tok).then(async (r) => {
+      callRetry('apiJoin', [session.id, seat, devicePid(), force, acct.tok], { onRetry: () => toast(crowded) }).then(async (r) => {
         if (r.seatTaken) {
           const yes = await modal('이 자리에 다른 학생이 있어요', `${seat}번 자리에 ${r.who} 학생이 먼저 들어와 있어요. 내 자리가 ${seat}번이 맞나요?`, { ok: '네, 맞아요', cancel: '다시 고르기' });
           if (yes) goIn(seat, acct, true); else seats(acct);
@@ -150,7 +153,7 @@ export function startCard(body, deck) {
       }).catch((e) => {
         // 출입증이 지났으면(6시간) 다시 로그인
         if (/로그인/.test(e.message)) { toast('다시 로그인해 주세요.', 'bad'); login(acct.sno); return; }
-        toast(`들어가지 못했어요 — ${e.message}`, 'bad');
+        toast(`들어가지 못했어요 — ${errText(e)}`, 'bad');
       });
     }
     login(prev ? prev.sno : '');
@@ -188,7 +191,8 @@ export function resultCard(body, deck) {
       h('div', { class: 'wu-list' + (rows.length > 5 ? ' two' : '') }, ...rows),
       part === 'p1' ? h('p', { class: 'muted wu-next' }, '다음 시간 — else·finally 와 👾 보스전! 오늘 기록은 그대로 이어져요.') : null),
     h('div', { class: 'res-foot' },
-      ME.num ? h('span', { class: 'muted' }, NET.status === 'err' ? '⚠ 선생님께 기록을 보내지 못한 것이 있어요.' : `✅ ${ME.stu} 학생의 기록이 선생님께 보내졌어요.`)
+      ME.num ? h('span', { class: 'muted' }, NET.pending > 0 ? `⏳ 선생님께 기록을 보내는 중이에요 (${NET.pending}개 남음). 창을 닫지 말아 주세요.`
+        : NET.status === 'err' ? '⚠ 선생님께 기록을 보내지 못한 것이 있어요.' : `✅ ${ME.stu} 학생의 기록이 선생님께 보내졌어요.`)
         : h('span', { class: 'muted' }, MODE === 'solo' ? '혼자 모드 — 기록은 이 브라우저에만 있어요.' : ''),
       h('button', { class: 'btn', onClick: () => deck.go(0) }, '↺ 처음 카드로'),
       h('button', { class: 'btn', onClick: () => askReset() }, '🧹 기록 초기화'))));

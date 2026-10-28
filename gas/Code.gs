@@ -136,9 +136,13 @@ function clearAll_() {
   CacheService.getScriptCache().removeAll(['dash:any']);
 }
 
+// 시트 쓰기는 한 번에 한 명씩(잠금). 30명이 한꺼번에 들어오면 뒷사람이 기다리므로 25초까지 기다리고,
+// 그래도 못 잡으면 BUSY 로 시작하는 오류를 던진다 — 화면(src/net/gas.js)이 이 표식을 보고 조금 뒤 저절로 다시 보낸다.
+var LOCK_WAIT = 25000;
+var BUSY = 'BUSY: 지금 접속이 몰려 있어요. 잠시 뒤 다시 해 주세요.';
 function withLock_(fn) {
   var lock = LockService.getScriptLock();
-  lock.waitLock(10000);
+  if (!lock.tryLock(LOCK_WAIT)) throw new Error(BUSY);
   try { return fn(); } finally { lock.releaseLock(); }
 }
 

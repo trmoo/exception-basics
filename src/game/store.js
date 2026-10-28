@@ -3,6 +3,7 @@
  *  수업에 들어가 있으면 사건이 있을 때마다 서버로 짧게 보낸다(자리 · 로그인 출입증 + 기록. 학번·이름은 서버가 출입증으로 가린다).
  */
 import { call, online } from '../net/gas.js';
+import { retryable, wait } from '../net/retry.js';
 import { cardOf } from '../data/machine.js';
 import { openNext } from './hints.js';
 import { logicOf, logicOpenNext } from '../data/logic.js';
@@ -79,13 +80,47 @@ function snapshot() {
     quiz: q.filter(Boolean).length, quizN: q.length,
   };
 }
+// 보낼 사건 줄(outbox) — 한 번에 하나씩 차례로 보낸다. 접속이 몰려 실패하면 버리지 않고 조금 뒤 다시 보낸다.
+// 기록(state)은 줄에 넣을 때가 아니라 「보내는 순간」 의 것을 붙인다 — 늦게 보낸 옛 기록이 새 기록을 덮어쓰지 않게.
+const outbox = [];
+let sending = false;
+let lastFail = { x: '', at: 0 };
+const OUTBOX_MAX = 50;
 function send(kind, x) {
   if (!online || !ME.sid || !ME.num || !ME.tok) return;
-  NET.pending++;
-  call('apiEvent', { sid: ME.sid, pid: ME.pid, seat: ME.num, token: ME.tok, kind, x: String(x || ''), state: snapshot() })
-    .then(() => { NET.status = 'ok'; })
-    .catch(() => { NET.status = 'err'; })
-    .finally(() => { NET.pending--; listeners.forEach((f) => f(S)); });
+  x = String(x || '');
+  // 같은 곳에서 30초 안에 또 막히면 보내지 않는다 — 코드를 고쳐 가며 [확인] 을 여러 번 누르는 학생이 서버를 붙잡지 않게
+  if (kind === 'fail') {
+    if (lastFail.x === x && Date.now() - lastFail.at < 30000) return;
+    lastFail = { x, at: Date.now() };
+  }
+  if (outbox.length >= OUTBOX_MAX) outbox.shift();   // 너무 오래 끊겨 쌓이면 가장 옛 것부터 버린다(기록은 마지막 것에 다 들어 있다)
+  outbox.push({ kind, x, sid: ME.sid, num: ME.num, tok: ME.tok, pid: ME.pid });
+  pump();
+}
+async function pump() {
+  if (sending) return;
+  sending = true;
+  let tries = 0;
+  while (outbox.length) {
+    const ev = outbox[0];
+    NET.pending = outbox.length;
+    listeners.forEach((f) => f(S));
+    // 다른 학생으로 바뀌었으면 앞사람 것은 보내지 않는다
+    if (ev.sid !== ME.sid || ev.tok !== ME.tok) { outbox.shift(); continue; }
+    try {
+      await call('apiEvent', { sid: ev.sid, pid: ev.pid, seat: ev.num, token: ev.tok, kind: ev.kind, x: ev.x, state: snapshot() });
+      outbox.shift(); tries = 0; NET.status = 'ok';
+    } catch (e) {
+      if (!retryable(e)) { outbox.shift(); NET.status = 'err'; continue; }   // 다시 보내도 같은 실패(출입증이 지남 등)
+      NET.status = 'retry';
+      tries++;
+      await wait(Math.min(30000, 2000 * 2 ** Math.min(tries, 4)) * (0.5 + Math.random()));
+    }
+  }
+  NET.pending = 0;
+  sending = false;
+  listeners.forEach((f) => f(S));
 }
 
 /* ── 기록 ── */

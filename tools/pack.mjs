@@ -18,8 +18,17 @@ mkdirSync(OUT, { recursive: true });
 let html = readFileSync(new URL('index.html', DIST), 'utf-8');
 const m = html.match(/<script type="module" crossorigin>([\s\S]*?)<\/script>/);
 if (!m) throw new Error('dist/index.html 에서 모듈 스크립트를 찾지 못했어요. 빌드가 바뀌었나요?');
-const code = m[1];
+let code = m[1];
 if (/<\/script/i.test(code)) throw new Error('번들 안에 </script 글자가 있어요 — 스크립트가 중간에 끊깁니다.');
+// ⚠⚠ 앱스 스크립트(HtmlService)는 <script> 안의 「//」 부터 줄 끝까지를 주석으로 보고 지운다 —
+//    백틱 글자열 안이어도 지운다(2026-10-28 실제 배포에서 겪음: 파이썬의 「값 // 인원」 이 잘려
+//    스크립트 전체가 문법 오류 → 까만 화면). 번들 속 「//」 은 모두 글자열 안에 있으므로
+//    「/\u002f」 로 적으면 뜻은 같고 HtmlService 는 주석으로 보지 않는다.
+//    다만 「\//」(정규식의 /\// 같은 꼴)이나 String.raw 안에서는 뜻이 달라지므로 그런 것이 있으면 멈춘다.
+if (/\\\/\//.test(code)) throw new Error('번들 안에 「\\//」 가 있어요 — // 바꿔 적기가 뜻을 바꿀 수 있으니 직접 확인하세요.');
+if (/String\.raw/.test(code)) throw new Error('번들 안에 String.raw 가 있어요 — // 바꿔 적기가 뜻을 바꿀 수 있으니 직접 확인하세요.');
+code = code.replace(/\/\//g, () => '/\\u002f');
+if (code.includes('//')) throw new Error('번들 안에 「//」 가 남았어요 — 앱스 스크립트가 그 뒤를 지웁니다.');
 html = html.replace(m[0], () => '');
 html = html.replace('</body>', () => `<script>${code}</script>\n</body>`);
 // 앱스 스크립트의 HtmlService 템플릿이 아니므로 <? ?> 는 그대로 두어도 되지만, 혹시 몰라 확인만 한다

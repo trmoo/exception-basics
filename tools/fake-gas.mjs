@@ -51,6 +51,7 @@ export function makeGas() {
   const props = {};
   const cache = new Map(); // key → { v, until }
   let clock = Date.now;
+  const lock = { busy: false };  // lock.busy = true 로 두면 「잠금을 못 잡음」(30명이 몰린 때)을 흉내 낸다
   const ss = {
     getSheetByName: (n) => sheets.get(n) || null,
     insertSheet: (n) => { const s = new FakeSheet(n); sheets.set(n, s); return s; },
@@ -81,7 +82,7 @@ export function makeGas() {
         removeAll: (keys) => keys.forEach((k) => cache.delete(k)),
       }),
     },
-    LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
+    LockService: { getScriptLock: () => ({ waitLock() {}, tryLock: () => !lock.busy, releaseLock() {} }) },
     Utilities: {
       DigestAlgorithm: { SHA_256: 'SHA_256' },
       Charset: { UTF_8: 'UTF_8' },
@@ -102,7 +103,7 @@ export function makeGas() {
       },
     },
   };
-  return { env, sheets, props, cache, ui, setClock: (f) => { clock = f; } };
+  return { env, sheets, props, cache, ui, lock, setClock: (f) => { clock = f; } };
 }
 
 /** Code.gs 를 가짜 환경 위에서 불러 최상위 함수들을 꺼낸다 */

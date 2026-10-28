@@ -159,3 +159,34 @@ const throws = (fn) => { try { fn(); return ''; } catch (e) { return e.message; 
   api.menuClear();
   확인('기록 모두 지우기 (계정까지)', [gas.sheets.get('기록').getLastRow(), gas.sheets.get('현황').getLastRow(), gas.sheets.get('계정(비밀번호)').getLastRow(), api.apiHello().session], [1, 1, 1, null]);
 }
+
+묶음('서버 — 30명이 한꺼번에 몰릴 때 (잠금을 못 잡음)');
+{
+  const { api, gas } = loadServer();
+  const { retryable, errText } = await import('../src/net/retry.js');
+  gas.ui.promptAnswer = 'abcd';
+  api.menuPassword();
+  const s = api.apiStartSession(api.apiLogin('abcd').token, '2-1', 'p1');
+  const hong = api.apiStudentLogin('20307', '홍길동', 'pw1234');
+
+  gas.lock.busy = true;
+  const busyLogin = throws(() => api.apiStudentLogin('20399', '박새로', 'pw1234'));
+  참('잠금을 못 잡으면 BUSY 로 시작하는 오류', /^BUSY/.test(busyLogin));
+  참('그 오류는 화면이 다시 보낼 실패로 본다', retryable(new Error(busyLogin)));
+  참('화면에는 BUSY 표식 없이 보인다', !/BUSY/.test(errText(new Error(busyLogin))) && /몰려/.test(errText(new Error(busyLogin))));
+  확인('바쁠 때는 계정을 만들지 않는다', api.apiStudentCheck('20399').step, 'new');
+  참('사건도 BUSY', /^BUSY/.test(throws(() => api.apiEvent({ sid: s.id, pid: 'aaaaaa11', seat: 7, token: hong.token, kind: 'found', x: 'KeyError', state: {} }))));
+  참('자리 고르기도 BUSY', /^BUSY/.test(throws(() => api.apiJoin(s.id, 7, 'aaaaaa11', false, hong.token))));
+  // 바빠서 실패한 것은 비밀번호 틀림으로 세지 않는다
+  for (let i = 0; i < 12; i++) throws(() => api.apiStudentLogin('20307', '', 'pw1234'));
+
+  gas.lock.busy = false;
+  참('풀리면 같은 요청이 그대로 들어간다', api.apiStudentLogin('20399', '박새로', 'pw1234').ok);
+  참('바쁠 때 실패한 횟수는 막힘으로 세지 않는다', api.apiStudentLogin('20307', '', 'pw1234').ok);
+  참('자리 고르기도 다시 된다', api.apiJoin(s.id, 7, 'aaaaaa11', false, hong.token).ok);
+
+  // 다시 보내면 안 되는 실패 — 비밀번호 틀림·출입증 지남은 몇 번을 보내도 같다
+  참('출입증 지남은 다시 보내지 않는다', !retryable(new Error('다시 로그인해 주세요.')));
+  참('알 수 없는 사건도 다시 보내지 않는다', !retryable(new Error('알 수 없는 사건이에요.')));
+  참('통신이 끊긴 것은 다시 보낸다', retryable(new Error('NetworkError: Connection failure due to HTTP 0')) && retryable(new TypeError('Failed to fetch')));
+}

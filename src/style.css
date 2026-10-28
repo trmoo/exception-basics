@@ -385,7 +385,8 @@ code { font-family: var(--mono); background: #f3ece1; padding: 0 .3em; border-ra
 /* ── 자리 → 학번·이름 ── */
 .who-form { display: grid; grid-template-columns: 1fr; gap: 8px; max-width: 460px; background: var(--paper); border-radius: var(--r); padding: 14px 16px; box-shadow: var(--shadow); }
 .who-form label { display: grid; grid-template-columns: 120px 1fr; white-space: nowrap; align-items: center; gap: 10px; font-weight: 800; }
-.who-form input { font: inherit; font-size: 22px; font-weight: 700; padding: 6px 10px; border: 2px solid var(--line); border-radius: 10px; }
+/* 입력 칸은 제 기본 너비(size=20)를 고집해 1fr 칸 밖으로 삐져나온다 — 칸 너비에 맞춘다 */
+.who-form input { box-sizing: border-box; width: 100%; min-width: 0; font: inherit; font-size: 22px; font-weight: 700; padding: 6px 10px; border: 2px solid var(--line); border-radius: 10px; }
 .who-form input:focus { outline: none; border-color: var(--brand); }
 .who-seat { font-family: var(--title); font-weight: 400; font-size: 24px; color: var(--brand); }
 .who-msg { color: var(--bad); font-weight: 700; min-height: 1.4em; margin: 8px 0; }

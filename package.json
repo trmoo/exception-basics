@@ -1,0 +1,21 @@
+{
+  "name": "exception-basics",
+  "version": "1.0.0",
+  "description": "부숴봐! 자판기 (교재판) — 파이썬 예외 처리 카드형 학습 웹앱 + 앱스 스크립트 교사 대시보드",
+  "license": "UNLICENSED",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "vite",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "pack": "vite build && node tools/pack.mjs",
+    "test": "node test/run.mjs",
+    "check:syntax": "node tools/check-syntax.mjs"
+  },
+  "devDependencies": {
+    "vite": "^8.2.2",
+    "vite-plugin-singlefile": "^2.3.3"
+  }
+}

@@ -1,0 +1,567 @@
+{
+ "python": "3.12.3",
+ "cases": [
+  {
+   "name": "파일 읽기",
+   "output": "📢 오늘도 맛있게 드세요!",
+   "error": null
+  },
+  {
+   "name": "없는 파일",
+   "output": "",
+   "error": {
+    "type": "FileNotFoundError",
+    "msg": "[Errno 2] No such file or directory: '없는.txt'",
+    "line": 1
+   }
+  },
+  {
+   "name": "빈 파일 이름",
+   "output": "",
+   "error": {
+    "type": "FileNotFoundError",
+    "msg": "[Errno 2] No such file or directory: ''",
+    "line": 1
+   }
+  },
+  {
+   "name": "FileNotFoundError 잡기",
+   "output": "없음\n끝",
+   "error": null
+  },
+  {
+   "name": "readline · readlines",
+   "output": "첫째\n['둘째\\n', '셋째\\n']",
+   "error": null
+  },
+  {
+   "name": "except 순서",
+   "output": "I\n계속",
+   "error": null
+  },
+  {
+   "name": "잡히지 않는 종류",
+   "output": "",
+   "error": {
+    "type": "KeyError",
+    "msg": "'b'",
+    "line": 2
+   }
+  },
+  {
+   "name": "int 여러 꼴",
+   "output": "7\n8\nX\nX\nX",
+   "error": null
+  },
+  {
+   "name": "나누기",
+   "output": "3 3.5",
+   "error": {
+    "type": "ZeroDivisionError",
+    "msg": "integer division or modulo by zero",
+    "line": 2
+   }
+  },
+  {
+   "name": "자판기 · 번호에 「칠」",
+   "output": "",
+   "error": {
+    "type": "ValueError",
+    "msg": "invalid literal for int() with base 10: '칠'",
+    "line": 5
+   }
+  },
+  {
+   "name": "자판기 · 번호에 「2.5」",
+   "output": "",
+   "error": {
+    "type": "ValueError",
+    "msg": "invalid literal for int() with base 10: '2.5'",
+    "line": 5
+   }
+  },
+  {
+   "name": "자판기 · 사람 수에 「둘」",
+   "output": "",
+   "error": {
+    "type": "ValueError",
+    "msg": "invalid literal for int() with base 10: '둘'",
+    "line": 10
+   }
+  },
+  {
+   "name": "자판기 · 번호 7",
+   "output": "",
+   "error": {
+    "type": "IndexError",
+    "msg": "list index out of range",
+    "line": 6
+   }
+  },
+  {
+   "name": "자판기 · 번호 100",
+   "output": "",
+   "error": {
+    "type": "IndexError",
+    "msg": "list index out of range",
+    "line": 6
+   }
+  },
+  {
+   "name": "자판기 · 쿠폰 「happy」",
+   "output": "",
+   "error": {
+    "type": "KeyError",
+    "msg": "'happy'",
+    "line": 9
+   }
+  },
+  {
+   "name": "자판기 · 쿠폰 「BONUS」",
+   "output": "",
+   "error": {
+    "type": "KeyError",
+    "msg": "'BONUS'",
+    "line": 9
+   }
+  },
+  {
+   "name": "자판기 · 쿠폰 「FREE」",
+   "output": "",
+   "error": {
+    "type": "TypeError",
+    "msg": "unsupported operand type(s) for -: 'int' and 'str'",
+    "line": 9
+   }
+  },
+  {
+   "name": "자판기 · 사람 수 0",
+   "output": "",
+   "error": {
+    "type": "ZeroDivisionError",
+    "msg": "integer division or modulo by zero",
+    "line": 11
+   }
+  },
+  {
+   "name": "자판기 · 번호 칸을 비움",
+   "output": "",
+   "error": {
+    "type": "ValueError",
+    "msg": "invalid literal for int() with base 10: ''",
+    "line": 5
+   }
+  },
+  {
+   "name": "자판기 · 콜라 사기",
+   "output": "콜라 나왔습니다!\n한 명당 1200 원",
+   "error": null
+  },
+  {
+   "name": "자판기 · 우유 + HAPPY 쿠폰",
+   "output": "우유 나왔습니다!\n한 명당 600 원",
+   "error": null
+  },
+  {
+   "name": "자판기 · 커피를 둘이 나눠 내기",
+   "output": "커피 나왔습니다!\n한 명당 500 원",
+   "error": null
+  },
+  {
+   "name": "m1 답 · 번호에 「칠」",
+   "output": "숫자를 정확히 입력하세요.",
+   "error": null
+  },
+  {
+   "name": "m1 답 · 번호에 「2.5」",
+   "output": "숫자를 정확히 입력하세요.",
+   "error": null
+  },
+  {
+   "name": "m1 답 · 사람 수에 「둘」",
+   "output": "숫자를 정확히 입력하세요.",
+   "error": null
+  },
+  {
+   "name": "m1 답 · 번호 7",
+   "output": "",
+   "error": {
+    "type": "IndexError",
+    "msg": "list index out of range",
+    "line": 7
+   }
+  },
+  {
+   "name": "m1 답 · 번호 100",
+   "output": "",
+   "error": {
+    "type": "IndexError",
+    "msg": "list index out of range",
+    "line": 7
+   }
+  },
+  {
+   "name": "m1 답 · 쿠폰 「happy」",
+   "output": "",
+   "error": {
+    "type": "KeyError",
+    "msg": "'happy'",
+    "line": 10
+   }
+  },
+  {
+   "name": "m1 답 · 쿠폰 「BONUS」",
+   "output": "",
+   "error": {
+    "type": "KeyError",
+    "msg": "'BONUS'",
+    "line": 10
+   }
+  },
+  {
+   "name": "m1 답 · 쿠폰 「FREE」",
+   "output": "",
+   "error": {
+    "type": "TypeError",
+    "msg": "unsupported operand type(s) for -: 'int' and 'str'",
+    "line": 10
+   }
+  },
+  {
+   "name": "m1 답 · 사람 수 0",
+   "output": "",
+   "error": {
+    "type": "ZeroDivisionError",
+    "msg": "integer division or modulo by zero",
+    "line": 12
+   }
+  },
+  {
+   "name": "m1 답 · 번호 칸을 비움",
+   "output": "숫자를 정확히 입력하세요.",
+   "error": null
+  },
+  {
+   "name": "m1 답 · 콜라 사기",
+   "output": "콜라 나왔습니다!\n한 명당 1200 원",
+   "error": null
+  },
+  {
+   "name": "m1 답 · 우유 + HAPPY 쿠폰",
+   "output": "우유 나왔습니다!\n한 명당 600 원",
+   "error": null
+  },
+  {
+   "name": "m1 답 · 커피를 둘이 나눠 내기",
+   "output": "커피 나왔습니다!\n한 명당 500 원",
+   "error": null
+  },
+  {
+   "name": "m2 답 · 번호에 「칠」",
+   "output": "숫자를 정확히 입력하세요.",
+   "error": null
+  },
+  {
+   "name": "m2 답 · 번호에 「2.5」",
+   "output": "숫자를 정확히 입력하세요.",
+   "error": null
+  },
+  {
+   "name": "m2 답 · 사람 수에 「둘」",
+   "output": "숫자를 정확히 입력하세요.",
+   "error": null
+  },
+  {
+   "name": "m2 답 · 번호 7",
+   "output": "0~4번 중에서 골라 주세요.",
+   "error": null
+  },
+  {
+   "name": "m2 답 · 번호 100",
+   "output": "0~4번 중에서 골라 주세요.",
+   "error": null
+  },
+  {
+   "name": "m2 답 · 쿠폰 「happy」",
+   "output": "없는 쿠폰이에요.",
+   "error": null
+  },
+  {
+   "name": "m2 답 · 쿠폰 「BONUS」",
+   "output": "없는 쿠폰이에요.",
+   "error": null
+  },
+  {
+   "name": "m2 답 · 쿠폰 「FREE」",
+   "output": "이 쿠폰은 지금 쓸 수 없어요.",
+   "error": null
+  },
+  {
+   "name": "m2 답 · 사람 수 0",
+   "output": "0명은 나눠 낼 수 없어요.",
+   "error": null
+  },
+  {
+   "name": "m2 답 · 번호 칸을 비움",
+   "output": "숫자를 정확히 입력하세요.",
+   "error": null
+  },
+  {
+   "name": "m2 답 · 콜라 사기",
+   "output": "콜라 나왔습니다!\n한 명당 1200 원",
+   "error": null
+  },
+  {
+   "name": "m2 답 · 우유 + HAPPY 쿠폰",
+   "output": "우유 나왔습니다!\n한 명당 600 원",
+   "error": null
+  },
+  {
+   "name": "m2 답 · 커피를 둘이 나눠 내기",
+   "output": "커피 나왔습니다!\n한 명당 500 원",
+   "error": null
+  },
+  {
+   "name": "m3 답 · 번호에 「칠」",
+   "output": "숫자를 정확히 입력하세요.\n이용해 주셔서 감사합니다.",
+   "error": null
+  },
+  {
+   "name": "m3 답 · 번호에 「2.5」",
+   "output": "숫자를 정확히 입력하세요.\n이용해 주셔서 감사합니다.",
+   "error": null
+  },
+  {
+   "name": "m3 답 · 사람 수에 「둘」",
+   "output": "숫자를 정확히 입력하세요.\n이용해 주셔서 감사합니다.",
+   "error": null
+  },
+  {
+   "name": "m3 답 · 번호 7",
+   "output": "0~4번 중에서 골라 주세요.\n이용해 주셔서 감사합니다.",
+   "error": null
+  },
+  {
+   "name": "m3 답 · 번호 100",
+   "output": "0~4번 중에서 골라 주세요.\n이용해 주셔서 감사합니다.",
+   "error": null
+  },
+  {
+   "name": "m3 답 · 쿠폰 「happy」",
+   "output": "없는 쿠폰이에요.\n이용해 주셔서 감사합니다.",
+   "error": null
+  },
+  {
+   "name": "m3 답 · 쿠폰 「BONUS」",
+   "output": "없는 쿠폰이에요.\n이용해 주셔서 감사합니다.",
+   "error": null
+  },
+  {
+   "name": "m3 답 · 쿠폰 「FREE」",
+   "output": "이 쿠폰은 지금 쓸 수 없어요.\n이용해 주셔서 감사합니다.",
+   "error": null
+  },
+  {
+   "name": "m3 답 · 사람 수 0",
+   "output": "0명은 나눠 낼 수 없어요.\n이용해 주셔서 감사합니다.",
+   "error": null
+  },
+  {
+   "name": "m3 답 · 번호 칸을 비움",
+   "output": "숫자를 정확히 입력하세요.\n이용해 주셔서 감사합니다.",
+   "error": null
+  },
+  {
+   "name": "m3 답 · 콜라 사기",
+   "output": "콜라 나왔습니다!\n한 명당 1200 원\n이용해 주셔서 감사합니다.",
+   "error": null
+  },
+  {
+   "name": "m3 답 · 우유 + HAPPY 쿠폰",
+   "output": "우유 나왔습니다!\n한 명당 600 원\n이용해 주셔서 감사합니다.",
+   "error": null
+  },
+  {
+   "name": "m3 답 · 커피를 둘이 나눠 내기",
+   "output": "커피 나왔습니다!\n한 명당 500 원\n이용해 주셔서 감사합니다.",
+   "error": null
+  },
+  {
+   "name": "boss 답 · 번호에 「칠」",
+   "output": "숫자를 정확히 입력하세요.\n이용해 주셔서 감사합니다.",
+   "error": null
+  },
+  {
+   "name": "boss 답 · 번호에 「2.5」",
+   "output": "숫자를 정확히 입력하세요.\n이용해 주셔서 감사합니다.",
+   "error": null
+  },
+  {
+   "name": "boss 답 · 사람 수에 「둘」",
+   "output": "숫자를 정확히 입력하세요.\n이용해 주셔서 감사합니다.",
+   "error": null
+  },
+  {
+   "name": "boss 답 · 번호 7",
+   "output": "0~4번 중에서 골라 주세요.\n이용해 주셔서 감사합니다.",
+   "error": null
+  },
+  {
+   "name": "boss 답 · 번호 100",
+   "output": "0~4번 중에서 골라 주세요.\n이용해 주셔서 감사합니다.",
+   "error": null
+  },
+  {
+   "name": "boss 답 · 쿠폰 「happy」",
+   "output": "없는 쿠폰이에요.\n이용해 주셔서 감사합니다.",
+   "error": null
+  },
+  {
+   "name": "boss 답 · 쿠폰 「BONUS」",
+   "output": "없는 쿠폰이에요.\n이용해 주셔서 감사합니다.",
+   "error": null
+  },
+  {
+   "name": "boss 답 · 쿠폰 「FREE」",
+   "output": "이 쿠폰은 지금 쓸 수 없어요.\n이용해 주셔서 감사합니다.",
+   "error": null
+  },
+  {
+   "name": "boss 답 · 사람 수 0",
+   "output": "0명은 나눠 낼 수 없어요.\n이용해 주셔서 감사합니다.",
+   "error": null
+  },
+  {
+   "name": "boss 답 · 번호 칸을 비움",
+   "output": "숫자를 정확히 입력하세요.\n이용해 주셔서 감사합니다.",
+   "error": null
+  },
+  {
+   "name": "boss 답 · 콜라 사기",
+   "output": "콜라 나왔습니다!\n한 명당 1200 원\n이용해 주셔서 감사합니다.",
+   "error": null
+  },
+  {
+   "name": "boss 답 · 우유 + HAPPY 쿠폰",
+   "output": "우유 나왔습니다!\n한 명당 600 원\n이용해 주셔서 감사합니다.",
+   "error": null
+  },
+  {
+   "name": "boss 답 · 커피를 둘이 나눠 내기",
+   "output": "커피 나왔습니다!\n한 명당 500 원\n이용해 주셔서 감사합니다.",
+   "error": null
+  },
+  {
+   "name": "교재 l1 · 숫자=7",
+   "output": "입력한 값은 7 입니다.\n프로그램을 마칩니다.",
+   "error": null
+  },
+  {
+   "name": "교재 l1 · 숫자=hello",
+   "output": "",
+   "error": {
+    "type": "ValueError",
+    "msg": "invalid literal for int() with base 10: 'hello'",
+    "line": 1
+   }
+  },
+  {
+   "name": "교재 l1 · 숫자=3.5",
+   "output": "",
+   "error": {
+    "type": "ValueError",
+    "msg": "invalid literal for int() with base 10: '3.5'",
+    "line": 1
+   }
+  },
+  {
+   "name": "교재 l2 · 숫자=7",
+   "output": "입력한 값은 7 입니다.\n프로그램을 마칩니다.",
+   "error": null
+  },
+  {
+   "name": "교재 l2 · 숫자=hello",
+   "output": "정수를 입력해야 합니다.\n프로그램을 마칩니다.",
+   "error": null
+  },
+  {
+   "name": "교재 l2 · 숫자=3.5",
+   "output": "정수를 입력해야 합니다.\n프로그램을 마칩니다.",
+   "error": null
+  },
+  {
+   "name": "교재 l3a · 숫자1=5",
+   "output": "0으로 나눌 수 없습니다.",
+   "error": null
+  },
+  {
+   "name": "교재 l3a · 숫자1=다섯",
+   "output": "숫자를 정확히 입력하세요.",
+   "error": null
+  },
+  {
+   "name": "교재 l3a · 숫자2=2",
+   "output": "2.5",
+   "error": null
+  },
+  {
+   "name": "교재 l3a · 숫자2=0",
+   "output": "0으로 나눌 수 없습니다.",
+   "error": null
+  },
+  {
+   "name": "교재 l3b · 과일 번호=2",
+   "output": "선택한 과일: 포도",
+   "error": null
+  },
+  {
+   "name": "교재 l3b · 과일 번호=10",
+   "output": "유효하지 않은 인덱스입니다.",
+   "error": null
+  },
+  {
+   "name": "교재 l3b · 과일 번호=둘",
+   "output": "정수를 입력해야 합니다.",
+   "error": null
+  },
+  {
+   "name": "교재 l4 · 숫자=7",
+   "output": "입력한 값은 7 입니다.\n프로그램을 종료합니다.",
+   "error": null
+  },
+  {
+   "name": "교재 l4 · 숫자=hello",
+   "output": "정수를 입력해야 합니다.\n프로그램을 종료합니다.",
+   "error": null
+  },
+  {
+   "name": "남용 · except:",
+   "output": "문제가 생겼어요.",
+   "error": null
+  },
+  {
+   "name": "남용 · 이름 적기",
+   "output": "",
+   "error": {
+    "type": "NameError",
+    "msg": "name '번오' is not defined",
+    "line": 4
+   }
+  },
+  {
+   "name": "확인 문제 1",
+   "output": "숫자로 입력하세요.\n끝",
+   "error": null
+  },
+  {
+   "name": "확인 문제 2",
+   "output": "0으로 나눌 수 없어요.",
+   "error": null
+  },
+  {
+   "name": "확인 문제 4",
+   "output": "B\nC",
+   "error": null
+  }
+ ]
+}

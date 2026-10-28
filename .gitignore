@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.log
+.claude/
+# 개발 기록은 깃허브에 올리지 않는다 (2026-10-22 지시)
+CLAUDE.md
+# 교재 원본은 저작권상 올리지 않는다
+*.docx
+*.pdf
+*.hwp

@@ -24,7 +24,7 @@ function culprit(id, v) {
 function chipRow() {
   const n = Object.keys(S.cards).length;
   return h('div', { class: 'got-box' },
-    h('div', { class: 'got-title' }, h('b', {}, `📖 내 도감 ${n}/${CARDS.length}`), ' — 찾아낸 예외를 모으는 카드 모음'),
+    h('div', { class: 'got-title' }, h('b', {}, `📖 내 도감 ${n}/${CARDS.length}`), ' — 찾아낸 오류를 모은 카드 모음'),
     h('div', { class: 'got-row' }, ...CARDS.map((c) => {
       const got = !!S.cards[c.id];
       return h('span', { class: 'got' + (got ? ' on' : ''), style: { '--c': c.color } }, got ? `${c.icon} ${c.id}` : '❔ ???');

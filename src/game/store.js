@@ -10,7 +10,7 @@ import { openNext } from './hints.js';
 import { logicOf, logicOpenNext } from '../data/logic.js';
 import { wrapupFor, noteKey, collectNotes, notesSig } from '../data/wrapup.js';
 
-const fresh = () => ({ cards: {}, missions: {}, boss: 0, stars: 0, quiz: {}, picks: {}, codes: {}, hints: {}, logic: {}, lhints: {}, notes: {}, sent: {}, card: 0 });
+const fresh = () => ({ cards: {}, missions: {}, boss: 0, stars: 0, quiz: {}, picks: {}, codes: {}, hints: {}, hintOn: false, logic: {}, lhints: {}, notes: {}, sent: {}, card: 0 });
 
 // 지금 들어가 있는 수업과 학생 — name 은 수업 이름, num 은 자리 번호, sno·stu 는 학번·이름, tok 은 로그인 출입증
 export const ME = { sid: '', name: '', num: 0, pid: '', part: 'all', sno: '', stu: '', tok: '' };
@@ -146,6 +146,11 @@ export function addLogic(id, values) {
 }
 export function openLogicHint() {
   S.lhints = logicOpenNext(S.logic || {}, S.lhints || {});
+  save();
+}
+/** 선생님이 알려 준 비밀코드를 넣으면 1라운드 힌트가 열린다 (이 학생 기록에 남는다) */
+export function unlockHints() {
+  S.hintOn = true;
   save();
 }
 /** 1라운드 힌트를 한 단계 더 연다 (서버로는 보내지 않는다) */

@@ -94,3 +94,8 @@ export function openNext(found, seen = {}) {
   const now = seen[t.target] || 0;
   return { ...seen, [t.target]: Math.min(now + 1, STEPS[t.target].steps.length) };
 }
+
+/** 힌트 비밀코드 — 선생님이 알려 주기 전에는 1라운드 힌트를 쓸 수 없다.
+ *  ⚠ 화면 코드 안에 들어 있으니 「부정행위 방지」가 아니라 처음부터 힌트에 기대지 않게 하는 학습 장치다. */
+export const HINT_CODE = '1029';
+export function hintCodeOk(v) { return String(v ?? '').replace(/\s+/g, '') === HINT_CODE; }

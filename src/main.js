@@ -40,6 +40,8 @@ getParams().then((p) => {
       chapters: CHAPTERS.filter((ch) => cards.some((c) => c.chapter === ch.id))
         .map((ch) => (ME.part === 'p1' && ch.id === 'c6' ? { ...ch, short: '정리', label: '정리' } : ch)),
       start,
+      // 로그인(또는 혼자 모드 시작) 전에는 시작 카드에서 못 나간다 — ME.pid 는 들어간 뒤에만 생긴다
+      locked: () => !ME.pid,
       onMove: (i) => { if (ME.pid) setCard(cards[i].id); checkPart(cards[i].id); },
       chip: () => h('div', { class: 'me-chip' },
         ME.num ? `${ME.num}번 자리 · ${ME.stu}` : (MODE === 'solo' ? '혼자 모드' : '로그인 전'),

@@ -16,7 +16,7 @@ import { snoOk, nameOk, maskName, cleanSno, cleanName } from '../src/data/who.js
 import { LOGIC, logicHint, logicOpenNext, COMPARE, PAIR } from '../src/data/logic.js';
 import { PARTS, cardsFor, MISSIONS_OF } from '../src/data/parts.js';
 import { loadServer } from '../tools/fake-gas.mjs';
-import { ORDER as HINT_ORDER, STEPS as HINT_STEPS, currentHint, openNext } from '../src/game/hints.js';
+import { ORDER as HINT_ORDER, STEPS as HINT_STEPS, currentHint, openNext, HINT_CODE, hintCodeOk } from '../src/game/hints.js';
 
 // input( ) 에 차례로 값을 넣되 질문 문구는 찍지 않는다 (교실 콘솔의 메아리 없이 print 한 것만 본다)
 const run = (code, inputs = []) => runPython(code, { inputFn: (p, k) => inputs[k] });
@@ -143,6 +143,12 @@ for (const [i, q] of QUIZ.entries()) {
     확인(`${id} 마지막 힌트대로 넣으면 정말 그 예외`, runMachine(MACHINE_CODE, v).type, id);
     참(`${id} 힌트에 예외 이름을 쓰지 않는다`, HINT_STEPS[id].steps.every((t) => !HINT_ORDER.some((x) => t.includes(x))));
   }
+  확인('힌트 비밀코드는 1029', HINT_CODE, '1029');
+  확인('비밀코드 판정 — 맞음·빈칸 섞임·틀림·빈 값', [hintCodeOk('1029'), hintCodeOk(' 10 29 '), hintCodeOk('1028'), hintCodeOk(''), hintCodeOk(null)], [true, true, false, false, false]);
+  { const src = readFileSync(new URL('../src/cards/game.js', import.meta.url), 'utf8');
+    참('힌트 상자는 비밀코드를 넣기 전(S.hintOn 이 거짓)에는 잠겨 있다', /if \(!S\.hintOn\)/.test(src) && src.indexOf('!S.hintOn') < src.indexOf('openHint(); draw()')); }
+  { const src = readFileSync(new URL('../src/game/store.js', import.meta.url), 'utf8');
+    참('새 기록은 힌트가 잠긴 채로 시작한다', /hintOn: false/.test(src)); }
   확인('처음에는 아무 힌트도 열리지 않았다', [currentHint({}).level, currentHint({}).text], [0, '']);
   확인('하나도 못 찾았으면 가장 쉬운 것부터', currentHint({}).target, 'ValueError');
   확인('KeyError 를 찾았으면 TypeError 로 이어 준다', currentHint(found('ValueError', 'IndexError', 'KeyError')).target, 'TypeError');

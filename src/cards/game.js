@@ -1,13 +1,13 @@
 /*! 부숴봐! 자판기 (교재판) — © 2026 티쳐무 · 모든 권리 보유
  *  🎰 1라운드 「부숴봐!」 와 📖 예외 도감.
  */
-import { h, fill, modal, screenTimeout } from '../ui/dom.js';
+import { h, fill, modal, screenTimeout, toast } from '../ui/dom.js';
 import { createVending } from '../ui/vending.js';
 import { codeView, consoleView, inputForm } from '../ui/code.js';
 import { MACHINE_CODE, CARDS, cardOf, FIELDS } from '../data/machine.js';
 import { runMachine, logicSlip } from '../game/runner.js';
-import { S, addCard, openHint } from '../game/store.js';
-import { currentHint } from '../game/hints.js';
+import { S, addCard, openHint, unlockHints } from '../game/store.js';
+import { currentHint, hintCodeOk } from '../game/hints.js';
 import { koreanOf } from '../data/translate.js';
 
 /** 이 예외를 낸 입력 칸 — 도감 설명 창에서 그 칸에 「💥 여기서」 를 붙인다 */
@@ -37,6 +37,20 @@ function hintBox() {
   function draw() {
     const t = currentHint(S.cards, S.hints || {});
     if (!t) { fill(el, h('p', { class: 'hint-done' }, `🎉 ${CARDS.length}가지를 모두 찾았어요!`)); return; }
+    // 🔒 선생님이 비밀코드를 알려 주기 전에는 힌트가 잠겨 있다 — 먼저 스스로 부숴 보게
+    if (!S.hintOn) {
+      const code = h('input', { class: 'hint-code', type: 'password', inputmode: 'numeric', maxlength: 8, placeholder: '비밀코드', 'aria-label': '힌트 비밀코드', autocomplete: 'off' });
+      const msg = h('span', { class: 'hint-msg' });
+      const tryCode = () => {
+        if (hintCodeOk(code.value)) { unlockHints(); toast('💡 힌트가 열렸어요!', 'gold'); draw(); return; }
+        msg.textContent = '코드가 달라요'; code.value = ''; code.focus();
+      };
+      code.addEventListener('keydown', (e) => { if (e.key === 'Enter') tryCode(); });
+      fill(el,
+        h('p', { class: 'hint-wait' }, '🔒 힌트는 잠겨 있어요. 먼저 스스로 부숴 보세요! 선생님이 비밀코드를 알려 주면 열 수 있어요.'),
+        h('div', { class: 'hint-lock' }, code, h('button', { class: 'btn hint-btn', onClick: tryCode }, '🔓 열기'), msg));
+      return;
+    }
     const btn = t.more
       ? h('button', { class: 'btn hint-btn', onClick: () => { openHint(); draw(); } }, t.level ? `💡 다음 힌트 (${t.level + 1}/${t.total})` : '💡 힌트 보기')
       : null;

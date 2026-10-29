@@ -38,6 +38,7 @@ body { font-family: var(--font); color: var(--ink); display: flex; align-items: 
 .ch { --c: #999; font: inherit; font-size: 13px; font-weight: 800; border: 2px solid transparent; background: transparent; color: var(--muted); border-radius: 999px; padding: 4px 10px; cursor: pointer; white-space: nowrap; }
 .ch.done { color: var(--c); }
 .ch.on { background: var(--c); color: #fff; }
+.ch:disabled { opacity: .4; cursor: not-allowed; }
 
 /* ── 공통 ── */
 .btn { font: inherit; font-weight: 800; font-size: 16px; border: 2px solid var(--line); background: var(--paper); color: var(--ink); padding: 7px 14px; border-radius: 11px; cursor: pointer; }
@@ -197,6 +198,9 @@ code { font-family: var(--mono); background: #f3ece1; padding: 0 .3em; border-ra
 .hint-text b { color: var(--warn); }
 .hint-wait { color: var(--muted); font-size: 13px; }
 .hint-done { font-weight: 800; color: var(--brand); }
+.hint-lock { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.hint-code { font: inherit; font-size: 15px; width: 110px; padding: 4px 8px; border: 2px solid #e6c55a; border-radius: 8px; background: #fff; }
+.hint-msg { color: var(--bad); font-size: 13px; font-weight: 700; }
 .hint-btn { align-self: flex-start; background: #fff; border: 2px solid #e6c55a; color: #7a5600; font-weight: 800; padding: 4px 12px; }
 
 /* ── 도감 ── */

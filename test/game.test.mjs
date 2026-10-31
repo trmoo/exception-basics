@@ -16,7 +16,7 @@ import { snoOk, nameOk, maskName, cleanSno, cleanName } from '../src/data/who.js
 import { LOGIC, logicHint, logicOpenNext, COMPARE, PAIR } from '../src/data/logic.js';
 import { PARTS, cardsFor, MISSIONS_OF } from '../src/data/parts.js';
 import { loadServer } from '../tools/fake-gas.mjs';
-import { ORDER as HINT_ORDER, STEPS as HINT_STEPS, currentHint, openNext, HINT_CODE, hintCodeOk } from '../src/game/hints.js';
+import { ORDER as HINT_ORDER, STEPS as HINT_STEPS, currentHint, openNext, HINT_CODE, hintCodeOk, ANSWER_CODE, answerCodeOk } from '../src/game/hints.js';
 
 // input( ) 에 차례로 값을 넣되 질문 문구는 찍지 않는다 (교실 콘솔의 메아리 없이 print 한 것만 본다)
 const run = (code, inputs = []) => runPython(code, { inputFn: (p, k) => inputs[k] });
@@ -148,7 +148,13 @@ for (const [i, q] of QUIZ.entries()) {
   { const src = readFileSync(new URL('../src/cards/game.js', import.meta.url), 'utf8');
     참('힌트 상자는 비밀코드를 넣기 전(S.hintOn 이 거짓)에는 잠겨 있다', /if \(!S\.hintOn\)/.test(src) && src.indexOf('!S.hintOn') < src.indexOf('openHint(); draw()')); }
   { const src = readFileSync(new URL('../src/game/store.js', import.meta.url), 'utf8');
-    참('새 기록은 힌트가 잠긴 채로 시작한다', /hintOn: false/.test(src)); }
+    참('새 기록은 힌트가 잠긴 채로 시작한다', /hintOn: false/.test(src));
+    참('새 기록은 모범 방어막이 잠긴 채로 시작한다', /answerOn: false/.test(src)); }
+  확인('모범 방어막 비밀코드는 5050', ANSWER_CODE, '5050');
+  확인('모범 방어막 코드 판정 — 맞음·빈칸 섞임·힌트 코드·빈 값', [answerCodeOk('5050'), answerCodeOk(' 50 50 '), answerCodeOk('1029'), answerCodeOk(''), answerCodeOk(null)], [true, true, false, false, false]);
+  { const src = readFileSync(new URL('../src/cards/mission.js', import.meta.url), 'utf8');
+    참('보스전 모범 방어막은 S.answerOn 이 참일 때만 바로 불러오고, 아니면 비밀코드를 묻는다', /S\.answerOn \? useAnswer\(\) : askCode\(\)/.test(src) && /answerCodeOk\(code\.value\)/.test(src));
+    참('보스전 시작 코드는 모범 답안이 아니다(내 방어막 또는 맨손)', !/m\.boss \? m\.answer/.test(src)); }
   확인('처음에는 아무 힌트도 열리지 않았다', [currentHint({}).level, currentHint({}).text], [0, '']);
   확인('하나도 못 찾았으면 가장 쉬운 것부터', currentHint({}).target, 'ValueError');
   확인('KeyError 를 찾았으면 TypeError 로 이어 준다', currentHint(found('ValueError', 'IndexError', 'KeyError')).target, 'TypeError');

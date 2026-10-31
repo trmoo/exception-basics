@@ -99,3 +99,7 @@ export function openNext(found, seen = {}) {
  *  ⚠ 화면 코드 안에 들어 있으니 「부정행위 방지」가 아니라 처음부터 힌트에 기대지 않게 하는 학습 장치다. */
 export const HINT_CODE = '1029';
 export function hintCodeOk(v) { return String(v ?? '').replace(/\s+/g, '') === HINT_CODE; }
+
+/** 보스전 「모범 방어막」 비밀코드 — 선생님이 알려 주기 전에는 모범 답안을 불러올 수 없다(같은 학습 장치). */
+export const ANSWER_CODE = '5050';
+export function answerCodeOk(v) { return String(v ?? '').replace(/\s+/g, '') === ANSWER_CODE; }

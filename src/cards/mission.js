@@ -9,7 +9,8 @@ import { MACHINE_CODE, cardOf, FIELDS } from '../data/machine.js';
 import { MISSIONS, ATTACKS, NORMALS, missionOf } from '../data/missions.js';
 import { runMachine } from '../game/runner.js';
 import { checkMission, KINDS } from '../game/judge.js';
-import { S, saveCode, passMission, reportFail, setBoss } from '../game/store.js';
+import { S, saveCode, passMission, reportFail, setBoss, unlockAnswer } from '../game/store.js';
+import { answerCodeOk } from '../game/hints.js';
 
 const VERDICT = {
   blocked: { icon: '🛡️', cls: 'good', text: '막음' },
@@ -117,11 +118,31 @@ export function missionCard(id) {
       step();
     }
 
+    // 🔒 보스전 「모범 방어막」 은 선생님이 비밀코드를 알려 준 뒤에만 — 먼저 내 방어막으로 싸워 보게
+    function useAnswer() { ed.value = m.answer; saveCode(id, m.answer); }
+    function answerBtn() {
+      const btn = h('button', { class: 'btn small', onClick: () => (S.answerOn ? useAnswer() : askCode()) });
+      const label = () => { btn.textContent = S.answerOn ? '↺ 모범 방어막' : '🔒 모범 방어막'; };
+      async function askCode() {
+        const code = h('input', { class: 'hint-code', type: 'password', inputmode: 'numeric', maxlength: 8, placeholder: '비밀코드', 'aria-label': '모범 방어막 비밀코드', autocomplete: 'off' });
+        code.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); code.closest('.modal')?.querySelector('.primary')?.click(); } });
+        const ok = modal('🔒 모범 방어막은 잠겨 있어요', h('div', {},
+          h('p', {}, '먼저 내가 만든 방어막으로 보스와 싸워 보세요! 선생님이 비밀코드를 알려 주면 모범 방어막을 불러올 수 있어요.'),
+          h('div', { class: 'hint-lock' }, code)), { ok: '🔓 열기', cancel: '닫기' });
+        setTimeout(() => code.focus(), 0);
+        if (!(await ok)) return;
+        if (!answerCodeOk(code.value)) { toast('코드가 달라요'); return; }
+        unlockAnswer(); label(); useAnswer(); toast('🛡️ 모범 방어막을 불러왔어요!', 'gold');
+      }
+      label();
+      return btn;
+    }
+
     const prev = MISSIONS[MISSIONS.indexOf(m) - 1];
     const prevCode = prev && S.codes[prev.id];
     const tools = h('div', { class: 'ms-tools' },
       h('button', { class: 'btn primary', onClick: grade }, m.boss ? '👾 공격 시작!' : '🛡️ 채점하기'),
-      h('button', { class: 'btn small', onClick: () => { const v = m.boss ? m.answer : m.starter; ed.value = v; saveCode(id, v); } }, m.boss ? '↺ 모범 방어막' : '↺ 처음 코드'),
+      m.boss ? answerBtn() : h('button', { class: 'btn small', onClick: () => { ed.value = m.starter; saveCode(id, m.starter); } }, '↺ 처음 코드'),
       prevCode && !m.boss && id !== 'm2' ? h('button', { class: 'btn small', onClick: () => { ed.value = prevCode; saveCode(id, prevCode); toast(`미션 ${prev.no} 의 내 코드를 가져왔어요`); } }, `⬅ 미션 ${prev.no} 내 코드`) : null,
       m.boss ? h('button', { class: 'btn small', onClick: () => { ed.value = MACHINE_CODE; saveCode(id, MACHINE_CODE); } }, '🔥 맨손으로') : null);
 

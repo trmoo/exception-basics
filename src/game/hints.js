@@ -6,6 +6,8 @@
  *  ⚠ node 로 그대로 불러다 시험한다. DOM 을 만들지 말 것.
  */
 
+import { sha256hex } from '../lib/sha256.js';
+
 // 쉬운 것부터
 export const ORDER = ['ValueError', 'IndexError', 'KeyError', 'ZeroDivisionError', 'TypeError'];
 
@@ -100,6 +102,12 @@ export function openNext(found, seen = {}) {
 export const HINT_CODE = '1029';
 export function hintCodeOk(v) { return String(v ?? '').replace(/\s+/g, '') === HINT_CODE; }
 
-/** 보스전 「모범 방어막」 비밀코드 — 선생님이 알려 주기 전에는 모범 답안을 불러올 수 없다(같은 학습 장치). */
-export const ANSWER_CODE = '5050';
-export function answerCodeOk(v) { return String(v ?? '').replace(/\s+/g, '') === ANSWER_CODE; }
+/** 보스전 「모범 방어막」 비밀코드 — 선생님이 알려 주기 전에는 모범 답안을 불러올 수 없다.
+ *  공개 저장소라 원문 대신 해시(SHA-256)만 둔다. 코드가 필요한 선생님은 README 의 이메일로 문의한다.
+ *  바꾸려면 `node tools/hash-code.mjs 새코드` 로 나온 값을 ANSWER_HASH 에 붙인다. ⚠ 원문은 저장소 어디에도 적지 말 것.
+ *  (짧은 코드는 해시를 하나하나 맞춰 볼 수 있으므로 부정행위 방지가 아니라 학습 장치다) */
+const ANSWER_SALT = 'exc-basics-answer:';
+/** 앞뒤·사이 빈칸을 떼고 소문자로 맞춘 뒤 지문을 만든다 (대문자 잠금이 켜져 있어도 열리게) */
+export const answerHash = (v) => sha256hex(ANSWER_SALT + String(v ?? '').replace(/\s+/g, '').toLowerCase());
+export const ANSWER_HASH = '993483e4d43bdf371b9de7c20b1997c424022da6f7b1031c12843f3e487ebec1';
+export function answerCodeOk(v) { return String(v ?? '').trim() !== '' && answerHash(v) === ANSWER_HASH; }

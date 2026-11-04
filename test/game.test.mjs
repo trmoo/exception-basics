@@ -10,13 +10,14 @@ import { checkMission, evaluate, KINDS } from '../src/game/judge.js';
 import { runPython } from '../src/lib/pymini.js';
 import { scoreOf, stuckText } from '../src/teacher/score.js';
 import { koreanOf } from '../src/data/translate.js';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { WRAPUP, wrapupFor, cleanNote, noteKey, collectNotes, notesSig, emptyRequired } from '../src/data/wrapup.js';
 import { snoOk, nameOk, maskName, cleanSno, cleanName } from '../src/data/who.js';
 import { LOGIC, logicHint, logicOpenNext, COMPARE, PAIR } from '../src/data/logic.js';
 import { PARTS, cardsFor, MISSIONS_OF } from '../src/data/parts.js';
 import { loadServer } from '../tools/fake-gas.mjs';
-import { ORDER as HINT_ORDER, STEPS as HINT_STEPS, currentHint, openNext, HINT_CODE, hintCodeOk, ANSWER_CODE, answerCodeOk } from '../src/game/hints.js';
+import { ORDER as HINT_ORDER, STEPS as HINT_STEPS, currentHint, openNext, HINT_CODE, hintCodeOk, ANSWER_HASH, answerCodeOk } from '../src/game/hints.js';
+import { sha256hex } from '../src/lib/sha256.js';
 
 // input( ) 에 차례로 값을 넣되 질문 문구는 찍지 않는다 (교실 콘솔의 메아리 없이 print 한 것만 본다)
 const run = (code, inputs = []) => runPython(code, { inputFn: (p, k) => inputs[k] });
@@ -150,8 +151,20 @@ for (const [i, q] of QUIZ.entries()) {
   { const src = readFileSync(new URL('../src/game/store.js', import.meta.url), 'utf8');
     참('새 기록은 힌트가 잠긴 채로 시작한다', /hintOn: false/.test(src));
     참('새 기록은 모범 방어막이 잠긴 채로 시작한다', /answerOn: false/.test(src)); }
-  확인('모범 방어막 비밀코드는 5050', ANSWER_CODE, '5050');
-  확인('모범 방어막 코드 판정 — 맞음·빈칸 섞임·힌트 코드·빈 값', [answerCodeOk('5050'), answerCodeOk(' 50 50 '), answerCodeOk('1029'), answerCodeOk(''), answerCodeOk(null)], [true, true, false, false, false]);
+  참('모범 방어막 비밀코드는 해시(SHA-256 16진수 64글자)로만 들고 있다', /^[0-9a-f]{64}$/.test(ANSWER_HASH));
+  확인('자체 SHA-256 이 표준 값과 같다 (빈 글자 · abc)', [sha256hex(''), sha256hex('abc')],
+    ['e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad']);
+  확인('모범 방어막 코드 판정 — 옛 코드·힌트 코드·빈 값은 열리지 않는다', [answerCodeOk('5050'), answerCodeOk('1029'), answerCodeOk(''), answerCodeOk('  '), answerCodeOk(null)], [false, false, false, false, false]);
+  { // 원문은 저장소에 없다 — 이 컴퓨터의 test/local/answer-code.txt(gitignore)가 있을 때만 맞는 코드로 시험한다
+    const local = new URL('./local/answer-code.txt', import.meta.url);
+    if (existsSync(local)) {
+      const code = readFileSync(local, 'utf8').trim();
+      확인('맞는 코드 — 그대로·앞뒤 빈칸·대문자', [answerCodeOk(code), answerCodeOk(` ${code} `), answerCodeOk(code.toUpperCase())], [true, true, true]);
+      const tracked = ['src/game/hints.js', 'src/cards/mission.js', 'README.md', 'tools/hash-code.mjs', 'test/game.test.mjs']
+        .filter((p) => readFileSync(new URL('../' + p, import.meta.url), 'utf8').includes(code));
+      확인('원문 코드가 저장소에 올라가는 파일에 적혀 있지 않다', tracked, []);
+    } else console.log('  (test/local/answer-code.txt 가 없어 맞는 코드 시험은 건너뜀)');
+  }
   { const src = readFileSync(new URL('../src/cards/mission.js', import.meta.url), 'utf8');
     참('보스전 모범 방어막은 S.answerOn 이 참일 때만 바로 불러오고, 아니면 비밀코드를 묻는다', /S\.answerOn \? useAnswer\(\) : askCode\(\)/.test(src) && /answerCodeOk\(code\.value\)/.test(src));
     참('보스전 시작 코드는 모범 답안이 아니다(내 방어막 또는 맨손)', !/m\.boss \? m\.answer/.test(src)); }

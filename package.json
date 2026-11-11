@@ -12,7 +12,8 @@
     "preview": "vite preview",
     "pack": "vite build && node tools/pack.mjs",
     "test": "node test/run.mjs",
-    "check:syntax": "node tools/check-syntax.mjs"
+    "check:syntax": "node tools/check-syntax.mjs",
+    "site": "node tools/site.mjs"
   },
   "devDependencies": {
     "vite": "^8.2.2",

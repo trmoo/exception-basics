@@ -103,3 +103,11 @@ npm run pack           # 위 + dist/appsscript/ (붙여 넣을 파일) + dist/ga
 - 개발 서버를 켠 채 `학생 주소` 와 `?page=teacher` 를 탭 두 개로 열면, 같은 가짜 시트를 나눠 써서 배포 없이 처음부터 끝까지 시험할 수 있습니다.
 - `dist/gas-test.html` — 묶은 파일에 `google.script.run` 대역을 붙인 판. 개발 서버에서 `/dist/gas-test.html` 로 열면 앱스 스크립트 안에서와 똑같이 돕니다.
 - `PYTHONUTF8=1 python tools/golden.py` — 해석기를 견줄 기준을 진짜 파이썬으로 다시 만듭니다.
+
+## 체험 페이지
+
+설치 없이 학생 화면과 선생님 화면을 미리 써 볼 수 있습니다 → **https://trmoo.github.io/exception-basics/**
+
+서버 없이 브라우저 안의 가짜 시트에서 진짜 `Code.gs` 가 돌아, 적은 내용은 어디에도 보내지 않고 새로 고치면 사라집니다.
+`node tools/site.mjs` 가 `dist/site/` 에 만들고, 푸시하면 `.github/workflows/deploy.yml` 이 깃허브 Pages 에 올립니다.
+(진짜 앱은 구글 앱스 스크립트 웹앱이라 Pages 에서는 돌지 않습니다 — 이 주소는 체험용입니다.)
